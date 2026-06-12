@@ -74,14 +74,15 @@ export default function TaskCard({ task, onEdit, onDelete, onRefresh, compact = 
 
       <div className="task-card-footer">
         <div className="task-card-assignees">
-          {assignees.slice(0, 4).map((a, i) => (
-            <div key={a.id || i} className="assignee-avatar" title={a.name}>
-              {a.name?.charAt(0).toUpperCase()}
+          {assignees.slice(0, 3).map((a, i) => (
+            <div key={a.id || i} className="assignee-chip" title={a.name}>
+              <span className="assignee-chip-dot" />
+              {a.name}
             </div>
           ))}
-          {assignees.length > 4 && (
-            <div className="assignee-avatar" style={{ background: "#64748b" }}>
-              +{assignees.length - 4}
+          {assignees.length > 3 && (
+            <div className="assignee-chip assignee-chip-more">
+              +{assignees.length - 3} more
             </div>
           )}
         </div>

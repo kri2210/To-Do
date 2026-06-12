@@ -1,5 +1,6 @@
 import { Task } from "../models/Task.js";
 import { User } from "../models/User.js";
+import { sendTaskAssignmentEmail } from "../utils/sendEmail.js";
 
 // Helper: auto-mark overdue tasks
 async function markOverdueTasks() {
@@ -90,6 +91,17 @@ export async function createTask(body, user) {
   const populated = await Task.findById(task._id)
     .populate("assignedBy", "name email role")
     .populate("assignedTo", "name email role");
+
+  // Send email to every assigned person
+  for (const assignee of populated.assignedTo) {
+    await sendTaskAssignmentEmail(
+      assignee.email,
+      assignee.name,
+      populated.title,
+      populated.assignedBy.name,
+      populated.deadline
+    );
+  }
 
   return { status: 201, data: populated };
 }
