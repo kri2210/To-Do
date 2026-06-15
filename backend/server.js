@@ -108,62 +108,6 @@ async function requestHandler(req, res) {
       result = await taskRoutes(req, res, pathname, method, body);
     } else if (pathname === "/api/health" && method === "GET") {
       result = { status: 200, data: { status: "ok", timestamp: new Date().toISOString() } };
-    } else if (pathname === "/api/test-email" && method === "GET") {
-      try {
-        const { user } = Object.fromEntries(new URL(req.url, `http://${req.headers.host}`).searchParams.entries());
-        const userVal = process.env.EMAIL_USER || process.env.Email;
-        const passVal = process.env.EMAIL_APP_PASSWORD || process.env.Password;
-        const emailTo = user || userVal;
-
-        if (!emailTo) {
-          result = { status: 400, data: { message: "No recipient email address found or provided in query param (?user=...)." } };
-        } else if (!userVal || !passVal) {
-          result = {
-            status: 400,
-            data: {
-              message: "Email credentials missing on server.",
-              env_keys: Object.keys(process.env).filter(k => 
-                k.toLowerCase().includes("email") || k.toLowerCase().includes("pass") || k.toLowerCase().includes("user")
-              )
-            }
-          };
-        } else {
-          const { createTransporter } = await import("./utils/sendEmail.js");
-          const transporter = createTransporter();
-
-          await transporter.verify();
-
-          const info = await transporter.sendMail({
-            from: `"Test Manager" <${userVal}>`,
-            to: emailTo,
-            subject: "Test Email from Task Management App",
-            text: "This is a test email from the live server. Nodemailer is initialized successfully!",
-          });
-
-          result = {
-            status: 200,
-            data: {
-              message: "Email sent successfully!",
-              info,
-              env_keys: Object.keys(process.env).filter(k => 
-                k.toLowerCase().includes("email") || k.toLowerCase().includes("pass") || k.toLowerCase().includes("user")
-              )
-            }
-          };
-        }
-      } catch (err) {
-        result = {
-          status: 500,
-          data: {
-            message: "Failed to send email",
-            error: err.message,
-            stack: err.stack,
-            env_keys: Object.keys(process.env).filter(k => 
-              k.toLowerCase().includes("email") || k.toLowerCase().includes("pass") || k.toLowerCase().includes("user")
-            )
-          }
-        };
-      }
     }
 
     if (result) {

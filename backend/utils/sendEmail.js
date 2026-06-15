@@ -11,7 +11,7 @@ function getMailConfig() {
   return { user, pass };
 }
 
-export function createTransporter() {
+function createTransporter() {
   const { user, pass } = getMailConfig();
 
   return nodemailer.createTransport({
@@ -22,10 +22,6 @@ export function createTransporter() {
     tls: {
       rejectUnauthorized: false,
     },
-    family: 4, // Force IPv4
-    connectionTimeout: 5000, 
-    greetingTimeout: 5000,   
-    socketTimeout: 5000,
   });
 }
 
