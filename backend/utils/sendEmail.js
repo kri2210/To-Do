@@ -1,38 +1,37 @@
 import { createTransport } from "nodemailer";
 
-function createTransporter() {
+export async function sendTaskAssignmentEmail(assignee, task) {
   const user = process.env.EMAIL_USER;
   const pass = process.env.EMAIL_APP_PASSWORD;
 
+  console.log(`📧 [EMAIL DEBUG] Attempting to send email to: ${assignee.email}`);
+  console.log(`📧 [EMAIL DEBUG] EMAIL_USER set: ${user ? "YES (" + user + ")" : "NO ❌"}`);
+  console.log(`📧 [EMAIL DEBUG] EMAIL_APP_PASSWORD set: ${pass ? "YES (length: " + pass.length + ")" : "NO ❌"}`);
+
   if (!user || !pass) {
-    throw new Error(
-      "Email credentials are missing. Set EMAIL_USER and EMAIL_APP_PASSWORD in your Render environment."
-    );
+    throw new Error("EMAIL_USER or EMAIL_APP_PASSWORD is missing in environment variables.");
   }
 
-  return createTransport({
+  const transporter = createTransport({
     host: "smtp.gmail.com",
     port: 587,
     secure: false,
     auth: { user, pass },
     tls: { rejectUnauthorized: false },
   });
-}
 
-export async function sendTaskAssignmentEmail(assignee, task) {
-  const teamMembersStr = task.assignedTo.map((member) => member.name).join("\n");
+  console.log(`📧 [EMAIL DEBUG] Transporter created, verifying connection...`);
+
+  await transporter.verify();
+  console.log(`📧 [EMAIL DEBUG] SMTP connection verified ✅`);
+
+  const teamMembersStr = task.assignedTo.map((m) => m.name).join("\n");
   const dueDateStr = new Date(task.deadline).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
+    day: "numeric", month: "long", year: "numeric",
   });
   const currentDateTimeStr = new Date().toLocaleString("en-IN", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
+    day: "numeric", month: "long", year: "numeric",
+    hour: "2-digit", minute: "2-digit", hour12: true,
   });
   const companyName = process.env.COMPANY_NAME || "To-Do+";
 
@@ -82,13 +81,12 @@ Best Regards,
 Task Management System
 ${companyName}`;
 
-  const user = process.env.EMAIL_USER;
-  await createTransporter().sendMail({
+  const info = await transporter.sendMail({
     from: `"Task Manager" <${user}>`,
     to: assignee.email,
     subject: `New Task Assigned: ${task.title}`,
     text: emailBody,
   });
 
-  console.log(`✅ Email sent to ${assignee.email}`);
+  console.log(`✅ [EMAIL DEBUG] Email sent successfully to ${assignee.email} | MessageId: ${info.messageId}`);
 }
