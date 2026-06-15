@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 const adminLinks = [
@@ -49,11 +49,11 @@ export default function Sidebar({ isOpen, onClose }) {
         aria-label="Main navigation"
       >
         {/* Logo */}
-        <a href="/dashboard" className="sidebar-logo" onClick={onClose}>
+        <Link to="/dashboard" className="sidebar-logo" onClick={onClose}>
           <div className="sidebar-logo-text">
             To-Do<span>+</span>
           </div>
-        </a>
+        </Link>
 
         {/* Nav links */}
         <nav className="sidebar-nav">
