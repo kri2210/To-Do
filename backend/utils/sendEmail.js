@@ -84,14 +84,15 @@ Best Regards,
 Task Management System
 ${companyName}`;
 
-  const mailOptions = {
-    from: `"Task Manager" <${getMailConfig().user}>`,
-    to: assignee.email,
-    subject: `New Task Assigned: ${task.title}`,
-    text: emailBody,
-  };
-
   try {
+    const mailConfig = getMailConfig();
+    const mailOptions = {
+      from: `"Task Manager" <${mailConfig.user}>`,
+      to: assignee.email,
+      subject: `New Task Assigned: ${task.title}`,
+      text: emailBody,
+    };
+
     await createTransporter().sendMail(mailOptions);
     console.log(`Email sent to ${assignee.email}`);
   } catch (err) {
