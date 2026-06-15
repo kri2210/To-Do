@@ -108,8 +108,10 @@ taskSchema.index({ createdAt: -1 });
 taskSchema.set("toJSON", {
   virtuals: true,
   transform(_doc, ret) {
-    ret.id = ret._id.toString();
-    delete ret._id;
+    if (ret._id) {
+      ret.id = ret._id.toString();
+      delete ret._id;
+    }
   },
 });
 

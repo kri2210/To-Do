@@ -30,8 +30,9 @@ function setCorsHeaders(res) {
 }
 
 function sendJson(res, statusCode, data) {
+  const body = JSON.stringify(data);
   res.writeHead(statusCode, { "Content-Type": "application/json" });
-  res.end(JSON.stringify(data));
+  res.end(body);
 }
 
 function readBody(req) {

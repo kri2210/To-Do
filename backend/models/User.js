@@ -58,8 +58,10 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
 userSchema.set("toJSON", {
   virtuals: true,
   transform(_doc, ret) {
-    ret.id = ret._id.toString();
-    delete ret._id;
+    if (ret._id) {
+      ret.id = ret._id.toString();
+      delete ret._id;
+    }
     delete ret.password;
   },
 });
