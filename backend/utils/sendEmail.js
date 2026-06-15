@@ -89,6 +89,36 @@ Best Regards,
 Task Management System
 ${companyName}`;
 
+  // 1. Try sending via Resend HTTP API (Port 443 - Never Blocked by Render)
+  if (process.env.RESEND_API_KEY) {
+    try {
+      const response = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        },
+        body: JSON.stringify({
+          from: "Task Manager <onboarding@resend.dev>",
+          to: assignee.email,
+          subject: `New Task Assigned: ${task.title}`,
+          text: emailBody,
+        }),
+      });
+
+      const resData = await response.json();
+      if (response.ok) {
+        console.log(`Email sent to ${assignee.email} via Resend:`, resData.id);
+        return; // Success!
+      } else {
+        console.warn(`Resend HTTP API failed: ${resData.message || response.statusText}. Falling back to SMTP...`);
+      }
+    } catch (resErr) {
+      console.warn("Resend API failed to connect. Falling back to SMTP:", resErr.message);
+    }
+  }
+
+  // 2. Fallback: Gmail SMTP (Works locally, but fails on Render Free Tier)
   try {
     const mailConfig = getMailConfig();
     const mailOptions = {
@@ -99,7 +129,7 @@ ${companyName}`;
     };
 
     await createTransporter().sendMail(mailOptions);
-    console.log(`Email sent to ${assignee.email}`);
+    console.log(`Email sent to ${assignee.email} via SMTP`);
   } catch (err) {
     if (err?.code === "EAUTH" || err?.responseCode === 535) {
       console.error(
@@ -108,7 +138,7 @@ ${companyName}`;
       return;
     }
 
-    console.error(`Failed to send email to ${assignee.email}:`, err.message);
+    console.error(`Failed to send email to ${assignee.email} via SMTP:`, err.message);
   }
 }
 
