@@ -10,7 +10,17 @@ import { User } from "./models/User.js";
 dotenv.config();
 
 const PORT = process.env.PORT || 5000;
-const allowedOrigin = process.env.CLIENT_ORIGIN || "http://localhost:5173";
+
+let allowedOrigin = process.env.CLIENT_ORIGIN || "http://localhost:5173";
+if (allowedOrigin !== "*") {
+  allowedOrigin = allowedOrigin.trim();
+  if (!allowedOrigin.startsWith("http://") && !allowedOrigin.startsWith("https://")) {
+    allowedOrigin = "https://" + allowedOrigin;
+  }
+  if (allowedOrigin.endsWith("/")) {
+    allowedOrigin = allowedOrigin.slice(0, -1);
+  }
+}
 
 function setCorsHeaders(res) {
   res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
