@@ -1,11 +1,21 @@
 import nodemailer from "nodemailer";
 
 function getMailConfig() {
-  const user = process.env.EMAIL_USER || process.env.Email;
-  const pass = process.env.EMAIL_APP_PASSWORD || process.env.Password;
+  const user =
+    process.env.EMAIL_USER ||
+    process.env.EMAIL ||
+    process.env.Email ||
+    process.env.email;
+  const pass =
+    process.env.EMAIL_APP_PASSWORD ||
+    process.env.EMAIL_PASSWORD ||
+    process.env.Password ||
+    process.env.password;
 
   if (!user || !pass) {
-    throw new Error("Email credentials are missing. Set EMAIL_USER and EMAIL_APP_PASSWORD in .env.");
+    throw new Error(
+      "Email credentials are missing. Set EMAIL_USER and EMAIL_APP_PASSWORD (or EMAIL/EMAIL_PASSWORD) in your environment."
+    );
   }
 
   return { user, pass };
