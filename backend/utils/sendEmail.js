@@ -117,6 +117,7 @@ Best Regards,
 
 Task Management System
 ${companyName}`;
+
   const user = process.env.EMAIL_USER;
   await transporter.sendMail({
     from: `"Task Manager" <${user}>`,
