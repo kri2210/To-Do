@@ -38,6 +38,15 @@ export function AuthProvider({ children }) {
     return userData;
   }, []);
 
+  const googleLogin = useCallback(async (googleToken) => {
+    const res = await authAPI.googleLogin(googleToken);
+    const { token, user: userData } = res.data;
+    localStorage.setItem("token", token);
+    localStorage.setItem("user", JSON.stringify(userData));
+    setUser(userData);
+    return userData;
+  }, []);
+
   const logout = useCallback(() => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
@@ -45,7 +54,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading, isAdmin: user?.role === "admin", isSenior: user?.role === "senior", isEmployee: user?.role === "employee" }}>
+    <AuthContext.Provider value={{ user, login, googleLogin, logout, loading, isAdmin: user?.role === "admin", isSenior: user?.role === "senior", isEmployee: user?.role === "employee" }}>
       {children}
     </AuthContext.Provider>
   );

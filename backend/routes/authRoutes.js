@@ -1,9 +1,14 @@
 import { authenticate } from "../middleware/auth.js";
-import { login, getMe, seedAdmin } from "../controllers/authController.js";
+import { login, getMe, seedAdmin, googleLogin } from "../controllers/authController.js";
 
 export async function authRoutes(req, res, pathname, method, body) {
   if (pathname === "/api/auth/login" && method === "POST") {
     const result = await login(body);
+    return result;
+  }
+
+  if (pathname === "/api/auth/google-login" && method === "POST") {
+    const result = await googleLogin(body);
     return result;
   }
 

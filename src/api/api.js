@@ -27,9 +27,10 @@ api.interceptors.response.use(
 
 // Auth
 export const authAPI = {
-  login:  (data) => api.post("/auth/login", data),
-  getMe:  ()     => api.get("/auth/me"),
-  seed:   ()     => api.post("/auth/seed"),
+  login:       (data) => api.post("/auth/login", data),
+  googleLogin: (token) => api.post("/auth/google-login", { token }),
+  getMe:       ()     => api.get("/auth/me"),
+  seed:        ()     => api.post("/auth/seed"),
 };
 
 // Users

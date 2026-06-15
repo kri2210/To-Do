@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, googleLogin } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: "", password: "" });
@@ -35,6 +35,39 @@ export default function Login() {
       setLoading(false);
     }
   };
+
+  const handleGoogleCredentialResponse = async (response) => {
+    setLoading(true);
+    try {
+      const userData = await googleLogin(response.credential);
+      toast(`Welcome back, ${userData.name}! 👋`, "success");
+      navigate("/dashboard");
+    } catch (err) {
+      toast(err.response?.data?.message || "Google login failed.", "error");
+      setErrors({ general: err.response?.data?.message || "Google login failed." });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const initializeGoogleSignIn = () => {
+      if (window.google?.accounts?.id) {
+        window.google.accounts.id.initialize({
+          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || "your-google-client-id-here.apps.googleusercontent.com",
+          callback: handleGoogleCredentialResponse,
+        });
+        window.google.accounts.id.renderButton(
+          document.getElementById("google-signin-btn"),
+          { theme: "outline", size: "large", width: "100%" }
+        );
+      } else {
+        setTimeout(initializeGoogleSignIn, 100);
+      }
+    };
+
+    initializeGoogleSignIn();
+  }, []);
 
   return (
     <div className="login-page">
@@ -101,7 +134,19 @@ export default function Login() {
           </button>
         </form>
 
-        
+        <div className="login-divider" style={{
+          display: "flex",
+          alignItems: "center",
+          margin: "20px 0",
+          color: "var(--text-secondary)",
+          fontSize: 12,
+        }}>
+          <span style={{ flex: 1, borderBottom: "1px solid var(--border)" }}></span>
+          <span style={{ padding: "0 10px", fontWeight: 500 }}>or continue with</span>
+          <span style={{ flex: 1, borderBottom: "1px solid var(--border)" }}></span>
+        </div>
+
+        <div id="google-signin-btn" style={{ width: "100%", display: "flex", justifyContent: "center" }}></div>
       </div>
     </div>
   );
