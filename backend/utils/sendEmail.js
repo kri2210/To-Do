@@ -1,32 +1,61 @@
 import nodemailer from "nodemailer";
 
+// ──────────────────────────────────────────────────────
+// SMTP fallback (works locally; blocked on Render free)
+// ──────────────────────────────────────────────────────
 function getMailConfig() {
   const user = process.env.EMAIL_USER || process.env.Email;
   const pass = process.env.EMAIL_APP_PASSWORD || process.env.Password;
-
-  if (!user || !pass) {
-    throw new Error("Email credentials are missing. Set EMAIL_USER and EMAIL_APP_PASSWORD in .env.");
-  }
-
+  if (!user || !pass) throw new Error("Email credentials missing.");
   return { user, pass };
 }
 
-function createTransporter() {
+function createSmtpTransporter() {
   const { user, pass } = getMailConfig();
-
   return nodemailer.createTransport({
     host: "smtp.gmail.com",
     port: 587,
     secure: false,
     auth: { user, pass },
-    tls: {
-      rejectUnauthorized: false,
-    },
+    tls: { rejectUnauthorized: false },
   });
 }
 
+// ──────────────────────────────────────────────────────
+// Primary sender: Resend HTTP API (port 443 — never
+// blocked by Render free tier)
+// Sign up free at https://resend.com → API Keys
+// Add RESEND_API_KEY to Render Environment Variables
+// ──────────────────────────────────────────────────────
+async function sendViaResend(to, subject, text) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) throw new Error("RESEND_API_KEY not set.");
+
+  const fromAddress = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({ from: fromAddress, to, subject, text }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(`Resend API error: ${data.message || response.statusText}`);
+  }
+
+  return data;
+}
+
+// ──────────────────────────────────────────────────────
+// Main export
+// ──────────────────────────────────────────────────────
 export async function sendTaskAssignmentEmail(assignee, task) {
-  const teamMembersStr = task.assignedTo.map(member => member.name).join("\n");
+  const teamMembersStr = task.assignedTo.map((m) => m.name).join("\n");
   const dueDateStr = new Date(task.deadline).toLocaleDateString("en-IN", {
     day: "numeric",
     month: "long",
@@ -68,7 +97,6 @@ ${task.priority || "Medium"}
 Description:
 ${task.description || "No description provided."}
 
-
 Team Members Assigned:
 ${teamMembersStr}
 
@@ -80,65 +108,43 @@ ${currentDateTimeStr}
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
-Please review the task details and begin working on it as per the requirements. Ensure that the task is completed before the specified deadline.
+Please review the task details and begin working on it as per the requirements.
+Ensure that the task is completed before the specified deadline.
 
 If you have any questions or require clarification, please contact the task assigner.
 
 Best Regards,
-
 Task Management System
 ${companyName}`;
 
-  // 1. Try sending via Resend HTTP API (Port 443 - Never Blocked by Render)
+  const subject = `New Task Assigned: ${task.title}`;
+
+  // 1️⃣ Try Resend first (works on Render free tier)
   if (process.env.RESEND_API_KEY) {
     try {
-      const response = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-        },
-        body: JSON.stringify({
-          from: "Task Manager <onboarding@resend.dev>",
-          to: assignee.email,
-          subject: `New Task Assigned: ${task.title}`,
-          text: emailBody,
-        }),
-      });
-
-      const resData = await response.json();
-      if (response.ok) {
-        console.log(`Email sent to ${assignee.email} via Resend:`, resData.id);
-        return; // Success!
-      } else {
-        console.warn(`Resend HTTP API failed: ${resData.message || response.statusText}. Falling back to SMTP...`);
-      }
-    } catch (resErr) {
-      console.warn("Resend API failed to connect. Falling back to SMTP:", resErr.message);
+      const result = await sendViaResend(assignee.email, subject, emailBody);
+      console.log(`✅ Email sent to ${assignee.email} via Resend (id: ${result.id})`);
+      return;
+    } catch (err) {
+      console.warn(`⚠️ Resend failed for ${assignee.email}: ${err.message}. Falling back to SMTP...`);
     }
   }
 
-  // 2. Fallback: Gmail SMTP (Works locally, but fails on Render Free Tier)
+  // 2️⃣ Fallback: Gmail SMTP (works locally, blocked on Render free tier)
   try {
-    const mailConfig = getMailConfig();
-    const mailOptions = {
-      from: `"Task Manager" <${mailConfig.user}>`,
+    const { user } = getMailConfig();
+    await createSmtpTransporter().sendMail({
+      from: `"Task Manager" <${user}>`,
       to: assignee.email,
-      subject: `New Task Assigned: ${task.title}`,
+      subject,
       text: emailBody,
-    };
-
-    await createTransporter().sendMail(mailOptions);
-    console.log(`Email sent to ${assignee.email} via SMTP`);
+    });
+    console.log(`✅ Email sent to ${assignee.email} via SMTP`);
   } catch (err) {
     if (err?.code === "EAUTH" || err?.responseCode === 535) {
-      console.error(
-        `Failed to send email to ${assignee.email}: Gmail rejected the login. Use a Gmail App Password, not the account password.`
-      );
+      console.error(`❌ Gmail SMTP auth failed for ${assignee.email}: Use an App Password, not your account password.`);
       return;
     }
-
-    console.error(`Failed to send email to ${assignee.email} via SMTP:`, err.message);
+    console.error(`❌ SMTP send failed for ${assignee.email}:`, err.message);
   }
 }
-
