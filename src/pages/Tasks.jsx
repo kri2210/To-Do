@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
-import { useSocket } from "../context/SocketContext";
+
 import { tasksAPI } from "../api/api";
 import { useToast } from "../context/ToastContext";
 import TaskCard from "../components/TaskCard";
@@ -38,7 +38,7 @@ const containerVariants = {
 export default function Tasks() {
   const { user, isEmployee } = useAuth();
   const { toast } = useToast();
-  const { socket } = useSocket();
+
 
   const [tasks,           setTasks]           = useState([]);
   const [loading,         setLoading]         = useState(true);
@@ -73,25 +73,7 @@ export default function Tasks() {
     return () => clearTimeout(t);
   }, [fetchTasks]);
 
-  /* Socket.io — real-time task refresh */
-  useEffect(() => {
-    if (!socket) return;
-    const handleUpdate = (updatedTask) => {
-      setTasks((prev) =>
-        prev.map((t) => (t.id === updatedTask.id || t._id === updatedTask._id) ? updatedTask : t)
-      );
-      // Also update detail panel if it's the same task
-      setDetailTask((prev) =>
-        prev && (prev.id === updatedTask.id || prev._id === updatedTask._id) ? updatedTask : prev
-      );
-    };
-    socket.on("task:updated",  handleUpdate);
-    socket.on("task:progress", handleUpdate);
-    return () => {
-      socket.off("task:updated",  handleUpdate);
-      socket.off("task:progress", handleUpdate);
-    };
-  }, [socket]);
+
 
   const handleEdit = (task) => {
     setEditTask(task);
@@ -130,9 +112,6 @@ export default function Tasks() {
       {/* Filter Bar */}
       <div className="filter-bar">
         <div className="search-input-wrapper">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 16, height: 16, color: "var(--text-muted)", pointerEvents: "none" }}>
-            <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
-          </svg>
           <input
             id="task-search"
             className="search-input"

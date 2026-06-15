@@ -75,9 +75,6 @@ export default function UserManagement() {
           { label: "Employees", count: roleGroups.employee.length, color: "#166534",  },
         ].map((s) => (
           <div key={s.label} className="card" style={{ display: "flex", alignItems: "center", gap: 16, padding: "18px 20px" }}>
-            <div style={{ width: 44, height: 44, borderRadius: 12, background: s.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>
-              {s.icon}
-            </div>
             <div>
               <div style={{ fontSize: 28, fontWeight: 800, color: s.color }}>{s.count}</div>
               <div style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>{s.label}</div>
@@ -89,9 +86,6 @@ export default function UserManagement() {
       {/* Filter Bar */}
       <div className="filter-bar">
         <div className="search-input-wrapper">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
-          </svg>
           <input className="search-input" placeholder="Search by name or email..."
             value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
@@ -140,7 +134,7 @@ export default function UserManagement() {
                 <td><RoleBadge role={u.role} /></td>
                 <td>
                   <span className="badge" style={{ background: u.isActive !== false ? "#D1FAE5" : "#FEE2E2", color: u.isActive !== false ? "#065F46" : "#991B1B" }}>
-                    {u.isActive !== false ? " Active" : "⏸ Inactive"}
+                    {u.isActive !== false ? " Active" : " Inactive"}
                   </span>
                 </td>
                 <td style={{ fontSize: 13 }}>{formatDate(u.createdAt)}</td>

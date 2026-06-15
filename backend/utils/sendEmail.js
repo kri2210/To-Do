@@ -20,41 +20,89 @@ function createTransporter() {
   });
 }
 
-export async function sendTaskAssignmentEmail(toEmail, toName, taskTitle, assignedByName, deadline) {
-  const deadlineStr = new Date(deadline).toLocaleDateString("en-IN", {
+export async function sendTaskAssignmentEmail(assignee, task) {
+  const teamMembersStr = task.assignedTo.map(member => member.name).join("\n");
+  const dueDateStr = new Date(task.deadline).toLocaleDateString("en-IN", {
     day: "numeric",
     month: "long",
     year: "numeric",
   });
+  const currentDateTimeStr = new Date().toLocaleString("en-IN", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+  const companyName = process.env.COMPANY_NAME || "To-Do+";
+
+  const emailBody = `Dear ${assignee.name},
+
+A new task has been assigned to you through the Task Management System.
+
+━━━━━━━━━━━━━━━━━━━━━━
+TASK DETAILS
+━━━━━━━━━━━━━━━━━━━━━━
+
+Task Title:
+${task.title}
+
+Assigned By:
+${task.assignedBy?.name || "System"} (${task.assignedBy?.role || "Admin"})
+
+Assigned To:
+${assignee.name}
+
+Due Date:
+${dueDateStr}
+
+Priority:
+${task.priority || "Medium"}
+
+Description:
+${task.description || "No description provided."}
+
+
+Team Members Assigned:
+${teamMembersStr}
+
+Task Status:
+Pending
+
+Assigned On:
+${currentDateTimeStr}
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+Please review the task details and begin working on it as per the requirements. Ensure that the task is completed before the specified deadline.
+
+If you have any questions or require clarification, please contact the task assigner.
+
+Best Regards,
+
+Task Management System
+${companyName}`;
 
   const mailOptions = {
     from: `"Task Manager" <${getMailConfig().user}>`,
-    to: toEmail,
-    subject: `New Task Assigned: ${taskTitle}`,
-    text: `Hi ,
-
-You have been assigned a new task.
-
-Task        : ${taskTitle}
-Assigned By : ${assignedByName}
-Deadline    : ${deadlineStr}
-
-
-Regards,
-`,
+    to: assignee.email,
+    subject: `New Task Assigned: ${task.title}`,
+    text: emailBody,
   };
 
   try {
     await createTransporter().sendMail(mailOptions);
-    console.log(`Email sent to ${toEmail}`);
+    console.log(`Email sent to ${assignee.email}`);
   } catch (err) {
     if (err?.code === "EAUTH" || err?.responseCode === 535) {
       console.error(
-        `Failed to send email to ${toEmail}: Gmail rejected the login. Use a Gmail App Password, not the account password.`
+        `Failed to send email to ${assignee.email}: Gmail rejected the login. Use a Gmail App Password, not the account password.`
       );
       return;
     }
 
-    console.error(`Failed to send email to ${toEmail}:`, err.message);
+    console.error(`Failed to send email to ${assignee.email}:`, err.message);
   }
 }
+

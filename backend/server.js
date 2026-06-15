@@ -1,7 +1,6 @@
 import http from "node:http";
 import { URL } from "node:url";
 import dotenv from "dotenv";
-import { Server as SocketServer } from "socket.io";
 import { connectDatabase } from "./config/database.js";
 import { authRoutes } from "./routes/authRoutes.js";
 import { userRoutes } from "./routes/userRoutes.js";
@@ -57,17 +56,13 @@ async function autoSeedAdmin() {
       if (!isValid) {
         existing.password = "Admin@123";
         await existing.save();
-        console.log("🔧 Admin password reset: admin@company.com / Admin@123");
+        console.log(" Admin password reset: admin@company.com / Admin@123");
       }
     }
   } catch (err) {
-    console.error("⚠️  Admin seed failed:", err.message);
+    console.error("  Admin seed failed:", err.message);
   }
 }
-
-// Global socket.io instance for emitting from controllers
-let _io = null;
-export function getIO() { return _io; }
 
 async function requestHandler(req, res) {
   setCorsHeaders(res);
@@ -100,14 +95,6 @@ async function requestHandler(req, res) {
       result = await userRoutes(req, res, pathname, method, body);
     } else if (pathname.startsWith("/api/tasks")) {
       result = await taskRoutes(req, res, pathname, method, body);
-      // Emit socket events for task mutations
-      if (result && _io && ["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
-        if (pathname.includes("/progress")) {
-          _io.emit("task:progress", result.data);
-        } else {
-          _io.emit("task:updated", result.data);
-        }
-      }
     } else if (pathname === "/api/health" && method === "GET") {
       result = { status: 200, data: { status: "ok", timestamp: new Date().toISOString() } };
     }
@@ -127,23 +114,6 @@ await connectDatabase();
 await autoSeedAdmin();
 
 const server = http.createServer(requestHandler);
-
-// Attach Socket.io
-_io = new SocketServer(server, {
-  cors: {
-    origin: allowedOrigin,
-    methods: ["GET", "POST"],
-    credentials: true,
-  },
-  transports: ["websocket", "polling"],
-});
-
-_io.on("connection", (socket) => {
-  console.log(` Socket connected: ${socket.id}`);
-  socket.on("disconnect", () => {
-    console.log(` Socket disconnected: ${socket.id}`);
-  });
-});
 
 server.listen(PORT, () => {
   console.log(` Server running on http://localhost:${PORT}`);

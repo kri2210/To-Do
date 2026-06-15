@@ -122,13 +122,7 @@ export async function createTask(body, user) {
 
   // Send email to every assigned person
   for (const assignee of populated.assignedTo) {
-    await sendTaskAssignmentEmail(
-      assignee.email,
-      assignee.name,
-      populated.title,
-      populated.assignedBy.name,
-      populated.deadline
-    );
+    await sendTaskAssignmentEmail(assignee, populated);
   }
 
   return { status: 201, data: populated };

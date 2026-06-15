@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
-import { useSocket } from "../context/SocketContext";
+
 import { tasksAPI } from "../api/api";
 import { StatusBadge, PriorityBadge } from "../components/Badges";
 
@@ -82,7 +82,7 @@ function buildEmployeePerf(teamTasks = []) {
 
 export default function SeniorDashboard() {
   const { user } = useAuth();
-  const { socket } = useSocket();
+
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -95,13 +95,7 @@ export default function SeniorDashboard() {
 
   useEffect(() => { fetchData(); }, []);
 
-  useEffect(() => {
-    if (!socket) return;
-    const refresh = () => fetchData();
-    socket.on("task:updated",  refresh);
-    socket.on("task:progress", refresh);
-    return () => { socket.off("task:updated", refresh); socket.off("task:progress", refresh); };
-  }, [socket]);
+
 
   const c = data?.counts || {};
   const totalTeamTasks = (c.myPending ?? 0) + (c.myInProgress ?? 0) + (c.myCompleted ?? 0) + (c.myOverdue ?? 0);
