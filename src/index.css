@@ -997,7 +997,7 @@ tbody tr:last-child td {
 
 .search-input {
   width: 100%;
-  padding: 8px 12px 8px 32px;
+  padding: 8px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   font-size: 14px;
