@@ -120,7 +120,7 @@ export async function createTask(body, user) {
 
   const populated = await populateTask(Task.findById(task._id));
 
-  // Send email to every assigned person (non-blocking)
+  // Send email to every assigned person 
   for (const assignee of populated.assignedTo) {
     sendTaskAssignmentEmail(assignee, populated).catch((err) => {
       console.error(`Failed to send email to ${assignee.email}:`, err);
