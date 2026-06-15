@@ -1,4 +1,5 @@
 import http from "node:http";
+import https from "node:https";
 import { URL } from "node:url";
 import dotenv from "dotenv";
 import { connectDatabase } from "./config/database.js";
@@ -129,4 +130,21 @@ const server = http.createServer(requestHandler);
 server.listen(PORT, () => {
   console.log(` Server running on http://localhost:${PORT}`);
   console.log(` API Base: http://localhost:${PORT}/api`);
+
+  // ── Keep-alive ping for Render free tier ──────────────────────────
+  // Render spins down free services after 15 min of inactivity.
+  // This self-ping every 10 min prevents that cold-start delay.
+  const renderUrl = process.env.RENDER_EXTERNAL_URL;
+  if (renderUrl) {
+    const pingUrl = `${renderUrl}/api/health`;
+    setInterval(() => {
+      const mod = pingUrl.startsWith("https") ? https : http;
+      mod.get(pingUrl, (r) =>
+        console.log(`🏓 Keep-alive ping → ${pingUrl} [${r.statusCode}]`)
+      ).on("error", (e) =>
+        console.warn("⚠️  Keep-alive ping failed:", e.message)
+      );
+    }, 10 * 60 * 1000); // every 10 minutes
+    console.log(`🏓 Keep-alive enabled → ${pingUrl}`);
+  }
 });
