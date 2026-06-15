@@ -1,8 +1,10 @@
 import { authenticate } from "../middleware/auth.js";
 import {
   getTasks,
+  getTaskById,
   createTask,
   updateTask,
+  updateProgress,
   deleteTask,
   addComment,
   getAnalytics,
@@ -47,9 +49,15 @@ export async function taskRoutes(req, res, pathname, method, body) {
 
   if (taskIdMatch) {
     const taskId = taskIdMatch[1];
-
+    if (method === "GET") return getTaskById(taskId, user);
     if (method === "PUT") return updateTask(taskId, body, user);
     if (method === "DELETE") return deleteTask(taskId, user);
+  }
+
+  // PATCH /api/tasks/:id/progress
+  const progressMatch = pathname.match(/^\/api\/tasks\/([a-f0-9]{24})\/progress$/);
+  if (progressMatch && method === "PATCH") {
+    return updateProgress(progressMatch[1], body, user);
   }
 
   // POST /api/tasks/:id/comment

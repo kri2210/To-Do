@@ -1,34 +1,26 @@
 export function PriorityBadge({ priority }) {
   const map = {
-    Low: "badge badge-low",
+    Low:    "badge badge-low",
     Medium: "badge badge-medium",
-    High: "badge badge-high",
+    High:   "badge badge-high",
   };
-  const dots = { Low: "", Medium: "", High: "" };
   return (
     <span className={map[priority] || "badge"}>
-      {dots[priority]} {priority}
+      {priority}
     </span>
   );
 }
 
-export function StatusBadge({ status }) {
+export function StatusBadge({ status, large = false }) {
   const map = {
-    Pending: "badge badge-pending",
-    "In Progress": "badge badge-inprogress",
-    Completed: "badge badge-completed",
-    Overdue: "badge badge-overdue",
+    Pending:      "badge badge-pending",
+    "In Progress":"badge badge-inprogress",
+    Completed:    large ? "badge-completed-lg" : "badge badge-completed",
+    Overdue:      "badge badge-overdue",
   };
-  const icons = {
-    Pending: "",
-    "In Progress": "",
-    Completed: "",
-    Overdue: "",
-  };
-  const normalized = status === "In Progress" ? "inprogress" : status?.toLowerCase();
   return (
     <span className={map[status] || "badge"}>
-      {icons[status]} {status}
+      {status}
     </span>
   );
 }
@@ -36,7 +28,7 @@ export function StatusBadge({ status }) {
 export function RoleBadge({ role }) {
   return (
     <span className={`badge badge-role-${role}`}>
-      {role === "admin" ? "" : role === "senior" ? "" : ""} {role}
+      {role}
     </span>
   );
 }

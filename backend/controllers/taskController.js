@@ -14,6 +14,15 @@ async function markOverdueTasks() {
   );
 }
 
+// Populate helper
+function populateTask(query) {
+  return query
+    .populate("assignedBy", "name email role")
+    .populate("assignedTo", "name email role")
+    .populate("comments.author", "name role")
+    .populate("activityLog.user", "name role");
+}
+
 // GET /api/tasks
 export async function getTasks(user, query) {
   await markOverdueTasks();
@@ -23,23 +32,36 @@ export async function getTasks(user, query) {
   if (user.role === "employee") {
     filter.assignedTo = user._id;
   } else if (user.role === "senior") {
-    // Senior sees tasks assigned to them OR tasks they assigned
     filter.$or = [{ assignedTo: user._id }, { assignedBy: user._id }];
   }
-  // Admin sees all
 
   if (query.status) filter.status = query.status;
   if (query.priority) filter.priority = query.priority;
   if (query.category) filter.category = query.category;
   if (query.search) filter.title = { $regex: query.search, $options: "i" };
 
-  const tasks = await Task.find(filter)
-    .populate("assignedBy", "name email role")
-    .populate("assignedTo", "name email role")
-    .populate("comments.author", "name role")
-    .sort({ createdAt: -1 });
+  const tasks = await populateTask(
+    Task.find(filter).sort({ createdAt: -1 })
+  );
 
   return { status: 200, data: tasks };
+}
+
+// GET /api/tasks/:id
+export async function getTaskById(id, user) {
+  await markOverdueTasks();
+  const task = await populateTask(Task.findById(id));
+  if (!task) return { status: 404, data: { message: "Task not found." } };
+
+  // Permission check
+  if (user.role === "employee") {
+    const assignedIds = task.assignedTo.map((u) => u.id?.toString() || u._id?.toString());
+    if (!assignedIds.includes(user._id.toString())) {
+      return { status: 403, data: { message: "Access denied." } };
+    }
+  }
+
+  return { status: 200, data: task };
 }
 
 // POST /api/tasks
@@ -66,7 +88,6 @@ export async function createTask(body, user) {
     return { status: 400, data: { message: "At least one assignee is required." } };
   }
 
-  // Senior can only assign to employees
   if (user.role === "senior") {
     const assignees = await User.find({ _id: { $in: assignedTo } });
     const hasNonEmployee = assignees.some((a) => a.role !== "employee");
@@ -84,13 +105,20 @@ export async function createTask(body, user) {
     priority: priority || "Medium",
     category: category || "Task",
     status: "Pending",
+    progress: 0,
+    activityLog: [
+      {
+        user: user._id,
+        action: "created",
+        note: "Task created.",
+        timestamp: new Date(),
+      },
+    ],
   });
 
   await task.save();
 
-  const populated = await Task.findById(task._id)
-    .populate("assignedBy", "name email role")
-    .populate("assignedTo", "name email role");
+  const populated = await populateTask(Task.findById(task._id));
 
   // Send email to every assigned person
   for (const assignee of populated.assignedTo) {
@@ -116,13 +144,28 @@ export async function updateTask(id, body, user) {
     status, completionNotes, proofOfWork
   } = body;
 
-  // Employees can only update status, completionNotes, proofOfWork
+  const logEntries = [];
+
   if (user.role === "employee") {
     const assignedIds = task.assignedTo.map((id) => id.toString());
     if (!assignedIds.includes(user._id.toString())) {
       return { status: 403, data: { message: "You are not assigned to this task." } };
     }
-    if (status) task.status = status;
+    if (status && status !== task.status) {
+      logEntries.push({
+        user: user._id,
+        action: "status_change",
+        note: `Status changed from "${task.status}" to "${status}".`,
+        fromStatus: task.status,
+        toStatus: status,
+        timestamp: new Date(),
+      });
+      task.status = status;
+      if (status === "Completed") {
+        task.completedAt = new Date();
+        task.progress = 100;
+      }
+    }
     if (completionNotes) task.completionNotes = completionNotes;
     if (proofOfWork) task.proofOfWork = proofOfWork;
   } else {
@@ -143,34 +186,97 @@ export async function updateTask(id, body, user) {
     }
     if (priority) task.priority = priority;
     if (category) task.category = category;
-    if (status) task.status = status;
+    if (status && status !== task.status) {
+      logEntries.push({
+        user: user._id,
+        action: "status_change",
+        note: `Status changed from "${task.status}" to "${status}".`,
+        fromStatus: task.status,
+        toStatus: status,
+        timestamp: new Date(),
+      });
+      task.status = status;
+      if (status === "Completed") {
+        task.completedAt = new Date();
+        task.progress = 100;
+      }
+    }
     if (completionNotes !== undefined) task.completionNotes = completionNotes;
+
+    if (logEntries.length === 0 && (title || description !== undefined || priority || category || deadline || assignedTo)) {
+      logEntries.push({
+        user: user._id,
+        action: "edited",
+        note: "Task details updated.",
+        timestamp: new Date(),
+      });
+    }
+  }
+
+  if (logEntries.length > 0) {
+    task.activityLog.push(...logEntries);
   }
 
   await task.save();
 
-  const updated = await Task.findById(id)
-    .populate("assignedBy", "name email role")
-    .populate("assignedTo", "name email role");
+  const updated = await populateTask(Task.findById(id));
 
   return { status: 200, data: updated };
 }
 
-// DELETE /api/tasks/:id  — admin and senior (who created it)
-export async function deleteTask(id, user) {
+// PATCH /api/tasks/:id/progress
+export async function updateProgress(id, body, user) {
   const task = await Task.findById(id);
   if (!task) return { status: 404, data: { message: "Task not found." } };
 
-  if (user.role === "employee") {
-    return { status: 403, data: { message: "Employees cannot delete tasks." } };
+  // Permission check
+  const assignedIds = task.assignedTo.map((uid) => uid.toString());
+  if (user.role === "employee" && !assignedIds.includes(user._id.toString())) {
+    return { status: 403, data: { message: "You are not assigned to this task." } };
   }
 
-  if (user.role === "senior" && task.assignedBy.toString() !== user._id.toString()) {
-    return { status: 403, data: { message: "You can only delete tasks you created." } };
+  const { progress, note, status } = body;
+
+  if (progress !== undefined) {
+    if (typeof progress !== "number" || progress < 0 || progress > 100) {
+      return { status: 400, data: { message: "Progress must be a number between 0 and 100." } };
+    }
+    task.progress = progress;
   }
 
-  await Task.findByIdAndDelete(id);
-  return { status: 200, data: { message: "Task deleted successfully." } };
+  const logEntry = {
+    user: user._id,
+    action: "progress_update",
+    note: note?.trim() || `Progress updated to ${task.progress}%.`,
+    progress: task.progress,
+    timestamp: new Date(),
+  };
+
+  // Auto-update status based on progress
+  if (status && status !== task.status) {
+    logEntry.action = "status_change";
+    logEntry.fromStatus = task.status;
+    logEntry.toStatus = status;
+    task.status = status;
+    if (status === "Completed") {
+      task.completedAt = new Date();
+      task.progress = 100;
+      logEntry.progress = 100;
+    }
+  } else if (task.progress === 100 && task.status !== "Completed") {
+    logEntry.fromStatus = task.status;
+    logEntry.toStatus = "Completed";
+    task.status = "Completed";
+    task.completedAt = new Date();
+  } else if (task.progress > 0 && task.status === "Pending") {
+    task.status = "In Progress";
+  }
+
+  task.activityLog.push(logEntry);
+  await task.save();
+
+  const updated = await populateTask(Task.findById(id));
+  return { status: 200, data: updated };
 }
 
 // POST /api/tasks/:id/comment
@@ -183,13 +289,15 @@ export async function addComment(id, body, user) {
   }
 
   task.comments.push({ author: user._id, text: body.text.trim() });
+  task.activityLog.push({
+    user: user._id,
+    action: "comment",
+    note: body.text.trim(),
+    timestamp: new Date(),
+  });
   await task.save();
 
-  const updated = await Task.findById(id)
-    .populate("assignedBy", "name email role")
-    .populate("assignedTo", "name email role")
-    .populate("comments.author", "name role");
-
+  const updated = await populateTask(Task.findById(id));
   return { status: 200, data: updated };
 }
 
@@ -211,7 +319,6 @@ export async function getAnalytics() {
     User.countDocuments({ role: "employee" }),
   ]);
 
-  // Task completion by user
   const tasksByPriority = await Task.aggregate([
     { $group: { _id: "$priority", count: { $sum: 1 } } },
   ]);
@@ -220,14 +327,12 @@ export async function getAnalytics() {
     { $group: { _id: "$category", count: { $sum: 1 } } },
   ]);
 
-  // Recent tasks
   const recentTasks = await Task.find()
     .sort({ createdAt: -1 })
     .limit(5)
     .populate("assignedBy", "name")
     .populate("assignedTo", "name");
 
-  // Recent completions
   const recentCompletions = await Task.find({ status: "Completed" })
     .sort({ updatedAt: -1 })
     .limit(5)
@@ -268,7 +373,6 @@ export async function getMyAnalytics(user) {
     Task.countDocuments({ ...assignedToEmployeesFilter, status: "Overdue" }),
   ]);
 
-  // Team tasks (for senior)
   let teamProgress = [];
   if (user.role === "senior") {
     teamProgress = await Task.find({ assignedBy: user._id })
@@ -277,7 +381,6 @@ export async function getMyAnalytics(user) {
       .limit(10);
   }
 
-  // Today's tasks (for employee)
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
   const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
 
@@ -286,7 +389,6 @@ export async function getMyAnalytics(user) {
     deadline: { $gte: todayStart, $lte: todayEnd },
   }).populate("assignedBy", "name role");
 
-  // Upcoming deadlines (next 7 days)
   const nextWeek = new Date(); nextWeek.setDate(nextWeek.getDate() + 7);
   const upcomingDeadlines = await Task.find({
     assignedTo: user._id,
@@ -303,4 +405,21 @@ export async function getMyAnalytics(user) {
       upcomingDeadlines,
     },
   };
+}
+
+// DELETE /api/tasks/:id
+export async function deleteTask(id, user) {
+  const task = await Task.findById(id);
+  if (!task) return { status: 404, data: { message: "Task not found." } };
+
+  if (user.role === "employee") {
+    return { status: 403, data: { message: "Employees cannot delete tasks." } };
+  }
+
+  if (user.role === "senior" && task.assignedBy.toString() !== user._id.toString()) {
+    return { status: 403, data: { message: "You can only delete tasks you created." } };
+  }
+
+  await Task.findByIdAndDelete(id);
+  return { status: 200, data: { message: "Task deleted successfully." } };
 }

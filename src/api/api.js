@@ -27,28 +27,30 @@ api.interceptors.response.use(
 
 // Auth
 export const authAPI = {
-  login: (data) => api.post("/auth/login", data),
-  getMe: () => api.get("/auth/me"),
-  seed: () => api.post("/auth/seed"),
+  login:  (data) => api.post("/auth/login", data),
+  getMe:  ()     => api.get("/auth/me"),
+  seed:   ()     => api.post("/auth/seed"),
 };
 
 // Users
 export const usersAPI = {
-  getAll: (params) => api.get("/users", { params }),
-  create: (data) => api.post("/users", data),
-  update: (id, data) => api.put(`/users/${id}`, data),
-  delete: (id) => api.delete(`/users/${id}`),
+  getAll: (params)     => api.get("/users", { params }),
+  create: (data)       => api.post("/users", data),
+  update: (id, data)   => api.put(`/users/${id}`, data),
+  delete: (id)         => api.delete(`/users/${id}`),
 };
 
 // Tasks
 export const tasksAPI = {
-  getAll: (params) => api.get("/tasks", { params }),
-  create: (data) => api.post("/tasks", data),
-  update: (id, data) => api.put(`/tasks/${id}`, data),
-  delete: (id) => api.delete(`/tasks/${id}`),
-  addComment: (id, data) => api.post(`/tasks/${id}/comment`, data),
-  getAnalytics: () => api.get("/tasks/analytics"),
-  getMyAnalytics: () => api.get("/tasks/my-analytics"),
+  getAll:         (params)     => api.get("/tasks", { params }),
+  getById:        (id)         => api.get(`/tasks/${id}`),
+  create:         (data)       => api.post("/tasks", data),
+  update:         (id, data)   => api.put(`/tasks/${id}`, data),
+  updateProgress: (id, data)   => api.patch(`/tasks/${id}/progress`, data),
+  delete:         (id)         => api.delete(`/tasks/${id}`),
+  addComment:     (id, data)   => api.post(`/tasks/${id}/comment`, data),
+  getAnalytics:   ()           => api.get("/tasks/analytics"),
+  getMyAnalytics: ()           => api.get("/tasks/my-analytics"),
 };
 
 export default api;

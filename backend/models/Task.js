@@ -1,5 +1,22 @@
 import mongoose from "mongoose";
 
+const activityLogSchema = new mongoose.Schema(
+  {
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    action: {
+      type: String,
+      enum: ["status_change", "progress_update", "comment", "created", "edited"],
+      required: true,
+    },
+    note: { type: String, default: "", maxlength: 1000 },
+    progress: { type: Number, min: 0, max: 100 },
+    fromStatus: { type: String },
+    toStatus: { type: String },
+    timestamp: { type: Date, default: Date.now },
+  },
+  { _id: true }
+);
+
 const taskSchema = new mongoose.Schema(
   {
     title: {
@@ -45,6 +62,18 @@ const taskSchema = new mongoose.Schema(
       enum: ["Pending", "In Progress", "Completed", "Overdue"],
       default: "Pending",
     },
+    // New: progress percentage
+    progress: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: 0,
+    },
+    // New: when task was marked completed
+    completedAt: {
+      type: Date,
+      default: null,
+    },
     completionNotes: {
       type: String,
       default: "",
@@ -61,6 +90,8 @@ const taskSchema = new mongoose.Schema(
         createdAt: { type: Date, default: Date.now },
       },
     ],
+    // New: full activity log
+    activityLog: [activityLogSchema],
   },
   {
     timestamps: true,
@@ -68,11 +99,11 @@ const taskSchema = new mongoose.Schema(
   }
 );
 
-// Auto-compute overdue status before any find query
-taskSchema.pre(/^find/, function (next) {
-  this._startTime = Date.now();
-  next();
-});
+// Indexes for performance
+taskSchema.index({ assignedTo: 1, status: 1 });
+taskSchema.index({ assignedBy: 1 });
+taskSchema.index({ deadline: 1, status: 1 });
+taskSchema.index({ createdAt: -1 });
 
 taskSchema.set("toJSON", {
   virtuals: true,
