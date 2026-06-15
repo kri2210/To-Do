@@ -128,14 +128,8 @@ async function requestHandler(req, res) {
             }
           };
         } else {
-          const nodemailer = (await import("nodemailer")).default;
-          const transporter = nodemailer.createTransport({
-            service: "gmail",
-            auth: { user: userVal, pass: passVal },
-            connectionTimeout: 5000,
-            greetingTimeout: 5000,
-            socketTimeout: 5000,
-          });
+          const { createTransporter } = await import("./utils/sendEmail.js");
+          const transporter = createTransporter();
 
           await transporter.verify();
 
