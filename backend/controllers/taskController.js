@@ -122,10 +122,13 @@ export async function createTask(body, user) {
 
   // Send email to every assigned person 
   for (const assignee of populated.assignedTo) {
-    sendTaskAssignmentEmail(assignee, populated).catch((err) => {
-      console.error(`Failed to send email to ${assignee.email}:`, err);
-    });
+  try {
+    await sendTaskAssignmentEmail(assignee, populated);
+  } catch (err) {
+    console.error(`❌ Email failed for ${assignee.email}:`, err.message);
+    // Don't throw — task was created successfully, email failure is non-fatal
   }
+}
 
   return { status: 201, data: populated };
 }

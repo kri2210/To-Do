@@ -1,56 +1,30 @@
-import nodemailer from "nodemailer";
-
-function getMailConfig() {
-  const user =
-    process.env.EMAIL_USER ||
-    process.env.EMAIL ||
-    process.env.Email ||
-    process.env.email;
-  const pass =
-    process.env.EMAIL_APP_PASSWORD ||
-    process.env.EMAIL_PASSWORD ||
-    process.env.Password ||
-    process.env.password;
-
-  if (!user || !pass) {
-    throw new Error(
-      "Email credentials are missing. Set EMAIL_USER and EMAIL_APP_PASSWORD (or EMAIL/EMAIL_PASSWORD) in your environment."
-    );
-  }
-
-  return { user, pass };
-}
+// backend/utils/sendEmail.js
+import { createTransport } from "nodemailer";  // ← named import for v8
 
 function createTransporter() {
-  const { user, pass } = getMailConfig();
+  const user = process.env.EMAIL_USER;
+  const pass = process.env.EMAIL_APP_PASSWORD;
 
-  return nodemailer.createTransport({
+  if (!user || !pass) {
+    throw new Error("EMAIL_USER or EMAIL_APP_PASSWORD env var is missing on Render.");
+  }
+
+  return createTransport({
     host: "smtp.gmail.com",
     port: 587,
     secure: false,
     auth: { user, pass },
-    tls: {
-      rejectUnauthorized: false,
-    },
+    tls: { rejectUnauthorized: false },
   });
 }
 
 export async function sendTaskAssignmentEmail(assignee, task) {
-  const teamMembersStr = task.assignedTo.map(member => member.name).join("\n");
+  // Let errors throw — don't swallow them
+  const transporter = createTransporter();
+
   const dueDateStr = new Date(task.deadline).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
+    day: "numeric", month: "long", year: "numeric",
   });
-  const currentDateTimeStr = new Date().toLocaleString("en-IN", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  });
-  const companyName = process.env.COMPANY_NAME || "To-Do+";
 
   const emailBody = `Dear ${assignee.name},
 
@@ -97,28 +71,59 @@ If you have any questions or require clarification, please contact the task assi
 Best Regards,
 
 Task Management System
+${companyName}`;const emailBody = `Dear ${assignee.name},
+
+A new task has been assigned to you through the Task Management System.
+
+━━━━━━━━━━━━━━━━━━━━━━
+TASK DETAILS
+━━━━━━━━━━━━━━━━━━━━━━
+
+Task Title:
+${task.title}
+
+Assigned By:
+${task.assignedBy?.name || "System"} (${task.assignedBy?.role || "Admin"})
+
+Assigned To:
+${assignee.name}
+
+Due Date:
+${dueDateStr}
+
+Priority:
+${task.priority || "Medium"}
+
+Description:
+${task.description || "No description provided."}
+
+
+Team Members Assigned:
+${teamMembersStr}
+
+Task Status:
+Pending
+
+Assigned On:
+${currentDateTimeStr}
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+Please review the task details and begin working on it as per the requirements. Ensure that the task is completed before the specified deadline.
+
+If you have any questions or require clarification, please contact the task assigner.
+
+Best Regards,
+
+Task Management System
 ${companyName}`;
+  const user = process.env.EMAIL_USER;
+  await transporter.sendMail({
+    from: `"Task Manager" <${user}>`,
+    to: assignee.email,
+    subject: `New Task Assigned: ${task.title}`,
+    text: emailBody,
+  });
 
-  try {
-    const mailConfig = getMailConfig();
-    const mailOptions = {
-      from: `"Task Manager" <${mailConfig.user}>`,
-      to: assignee.email,
-      subject: `New Task Assigned: ${task.title}`,
-      text: emailBody,
-    };
-
-    await createTransporter().sendMail(mailOptions);
-    console.log(`Email sent to ${assignee.email}`);
-  } catch (err) {
-    if (err?.code === "EAUTH" || err?.responseCode === 535) {
-      console.error(
-        `Failed to send email to ${assignee.email}: Gmail rejected the login. Use a Gmail App Password, not the account password.`
-      );
-      return;
-    }
-
-    console.error(`Failed to send email to ${assignee.email}:`, err.message);
-  }
+  console.log(`✅ Email sent to ${assignee.email}`);
 }
-
