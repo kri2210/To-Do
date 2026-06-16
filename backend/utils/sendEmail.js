@@ -1,41 +1,18 @@
-import { createTransport } from "nodemailer";
+import { Resend } from "resend";
 
 export async function sendTaskAssignmentEmail(assignee, task) {
-  const user = process.env.EMAIL_USER;
-  const pass = process.env.EMAIL_APP_PASSWORD;
+  const apiKey = process.env.RESEND_API_KEY;
+  const fromEmail = process.env.EMAIL_FROM || "onboarding@resend.dev"; // use your verified domain in production
 
   console.log(`📧 [EMAIL DEBUG] Attempting to send email to: ${assignee.email}`);
-  console.log(`📧 [EMAIL DEBUG] EMAIL_USER set: ${user ? "YES (" + user + ")" : "NO ❌"}`);
-  console.log(`📧 [EMAIL DEBUG] EMAIL_APP_PASSWORD set: ${pass ? "YES (length: " + pass.length + ")" : "NO ❌"}`);
+  console.log(`📧 [EMAIL DEBUG] RESEND_API_KEY set: ${apiKey ? "YES" : "NO ❌"}`);
+  console.log(`📧 [EMAIL DEBUG] FROM: ${fromEmail}`);
 
-  if (!user || !pass) {
-    throw new Error("EMAIL_USER or EMAIL_APP_PASSWORD is missing in environment variables.");
+  if (!apiKey) {
+    throw new Error("RESEND_API_KEY is missing in environment variables.");
   }
 
-  const transporter = createTransport({
-  service: "gmail",
-  auth: {
-    user,
-    pass,
-  },
-
-  
-});
-
-  console.log(`📧 [EMAIL DEBUG] Transporter created, verifying connection...`);
-
-  try {
-  const info = await transporter.sendMail({
-    from: user,
-    to: user,
-    subject: "SMTP Test",
-    text: "Testing from Render",
-  });
-
-  console.log("Mail sent:", info);
-} catch (err) {
-  console.error("SENDMAIL ERROR:", err);
-}
+  const resend = new Resend(apiKey);
 
   const teamMembersStr = task.assignedTo.map((m) => m.name).join("\n");
   const dueDateStr = new Date(task.deadline).toLocaleDateString("en-IN", {
@@ -93,12 +70,17 @@ Best Regards,
 Task Management System
 ${companyName}`;
 
-  const info = await transporter.sendMail({
-    from: `"Task Manager" <${user}>`,
+  const { data, error } = await resend.emails.send({
+    from: `Task Manager <${fromEmail}>`,
     to: assignee.email,
     subject: `New Task Assigned: ${task.title}`,
     text: emailBody,
   });
 
-  console.log(`✅ [EMAIL DEBUG] Email sent successfully to ${assignee.email} | MessageId: ${info.messageId}`);
+  if (error) {
+    console.error(`❌ [EMAIL DEBUG] Resend error:`, error);
+    throw new Error(`Failed to send email: ${error.message}`);
+  }
+
+  console.log(`✅ [EMAIL DEBUG] Email sent successfully to ${assignee.email} | MessageId: ${data.id}`);
 }
