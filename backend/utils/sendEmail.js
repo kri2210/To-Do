@@ -19,12 +19,7 @@ export async function sendTaskAssignmentEmail(assignee, task) {
     pass,
   },
 
-  connectionTimeout: 10000,
-  greetingTimeout: 10000,
-  socketTimeout: 10000,
-
-  logger: true,
-  debug: true,
+  
 });
 
   console.log(`📧 [EMAIL DEBUG] Transporter created, verifying connection...`);
