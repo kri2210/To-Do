@@ -7,6 +7,9 @@ import { authRoutes } from "./routes/authRoutes.js";
 import { userRoutes } from "./routes/userRoutes.js";
 import { taskRoutes } from "./routes/taskRoutes.js";
 import { User } from "./models/User.js";
+import dns from "dns";
+
+dns.setDefaultResultOrder("ipv4first");
 
 dotenv.config();
 
