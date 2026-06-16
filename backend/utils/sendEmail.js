@@ -1,15 +1,32 @@
+import { createTransport } from "nodemailer";
+
 export async function sendTaskAssignmentEmail(assignee, task) {
-  const apiKey = process.env.BREVO_API_KEY;
-  const fromEmail = process.env.EMAIL_FROM || "shahkrish221005@gmail.com";
-  const fromName = process.env.EMAIL_FROM_NAME || "Task Manager";
+  const smtpLogin = process.env.BREVO_SMTP_LOGIN;   // your Brevo account email
+  const smtpKey   = process.env.BREVO_SMTP_KEY;     // Brevo SMTP key (not API key)
+  const fromEmail = process.env.EMAIL_FROM || smtpLogin;
+  const fromName  = process.env.EMAIL_FROM_NAME || "Task Manager";
 
   console.log(`📧 [EMAIL DEBUG] Attempting to send email to: ${assignee.email}`);
-  console.log(`📧 [EMAIL DEBUG] BREVO_API_KEY set: ${apiKey ? "YES" : "NO ❌"}`);
-  console.log(`📧 [EMAIL DEBUG] FROM: ${fromName} <${fromEmail}>`);
+  console.log(`📧 [EMAIL DEBUG] BREVO_SMTP_LOGIN set: ${smtpLogin ? "YES (" + smtpLogin + ")" : "NO ❌"}`);
+  console.log(`📧 [EMAIL DEBUG] BREVO_SMTP_KEY set: ${smtpKey ? "YES (length: " + smtpKey.length + ")" : "NO ❌"}`);
 
-  if (!apiKey) {
-    throw new Error("BREVO_API_KEY is missing in environment variables.");
+  if (!smtpLogin || !smtpKey) {
+    throw new Error("BREVO_SMTP_LOGIN or BREVO_SMTP_KEY is missing in environment variables.");
   }
+
+  const transporter = createTransport({
+    host: "smtp-relay.brevo.com",
+    port: 587,
+    secure: false, // STARTTLS
+    auth: {
+      user: smtpLogin,
+      pass: smtpKey,
+    },
+  });
+
+  console.log(`📧 [EMAIL DEBUG] Verifying Brevo SMTP connection...`);
+  await transporter.verify();
+  console.log(`📧 [EMAIL DEBUG] Brevo SMTP verified ✅`);
 
   const teamMembersStr = task.assignedTo.map((m) => m.name).join("\n");
   const dueDateStr = new Date(task.deadline).toLocaleDateString("en-IN", {
@@ -67,27 +84,12 @@ Best Regards,
 Task Management System
 ${companyName}`;
 
-  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
-    method: "POST",
-    headers: {
-      "api-key": apiKey,
-      "Content-Type": "application/json",
-      "Accept": "application/json",
-    },
-    body: JSON.stringify({
-      sender: { name: fromName, email: fromEmail },
-      to: [{ email: assignee.email, name: assignee.name }],
-      subject: `New Task Assigned: ${task.title}`,
-      textContent: emailBody,
-    }),
+  const info = await transporter.sendMail({
+    from: `"${fromName}" <${fromEmail}>`,
+    to: assignee.email,
+    subject: `New Task Assigned: ${task.title}`,
+    text: emailBody,
   });
 
-  const data = await response.json();
-
-  if (!response.ok) {
-    console.error(`❌ [EMAIL DEBUG] Brevo API error:`, data);
-    throw new Error(`Failed to send email: ${data.message || response.statusText}`);
-  }
-
-  console.log(`✅ [EMAIL DEBUG] Email sent successfully to ${assignee.email} | MessageId: ${data.messageId}`);
+  console.log(`✅ [EMAIL DEBUG] Email sent to ${assignee.email} | MessageId: ${info.messageId}`);
 }
