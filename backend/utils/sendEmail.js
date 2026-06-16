@@ -1,8 +1,6 @@
-import * as Brevo from "@getbrevo/brevo";
-
 export async function sendTaskAssignmentEmail(assignee, task) {
   const apiKey = process.env.BREVO_API_KEY;
-  const fromEmail = process.env.EMAIL_FROM || "noreply@yourdomain.com";
+  const fromEmail = process.env.EMAIL_FROM || "shahkrish221005@gmail.com";
   const fromName = process.env.EMAIL_FROM_NAME || "Task Manager";
 
   console.log(`📧 [EMAIL DEBUG] Attempting to send email to: ${assignee.email}`);
@@ -12,9 +10,6 @@ export async function sendTaskAssignmentEmail(assignee, task) {
   if (!apiKey) {
     throw new Error("BREVO_API_KEY is missing in environment variables.");
   }
-
-  const apiInstance = new Brevo.TransactionalEmailsApi();
-  apiInstance.authentications["api-key"].apiKey = apiKey;
 
   const teamMembersStr = task.assignedTo.map((m) => m.name).join("\n");
   const dueDateStr = new Date(task.deadline).toLocaleDateString("en-IN", {
@@ -72,13 +67,27 @@ Best Regards,
 Task Management System
 ${companyName}`;
 
-  const sendSmtpEmail = new Brevo.SendSmtpEmail();
-  sendSmtpEmail.subject = `New Task Assigned: ${task.title}`;
-  sendSmtpEmail.textContent = emailBody;
-  sendSmtpEmail.sender = { name: fromName, email: fromEmail };
-  sendSmtpEmail.to = [{ email: assignee.email, name: assignee.name }];
+  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      "api-key": apiKey,
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+    },
+    body: JSON.stringify({
+      sender: { name: fromName, email: fromEmail },
+      to: [{ email: assignee.email, name: assignee.name }],
+      subject: `New Task Assigned: ${task.title}`,
+      textContent: emailBody,
+    }),
+  });
 
-  const result = await apiInstance.sendTransacEmail(sendSmtpEmail);
+  const data = await response.json();
 
-  console.log(`✅ [EMAIL DEBUG] Email sent successfully to ${assignee.email} | MessageId: ${result.body?.messageId || result.messageId}`);
+  if (!response.ok) {
+    console.error(`❌ [EMAIL DEBUG] Brevo API error:`, data);
+    throw new Error(`Failed to send email: ${data.message || response.statusText}`);
+  }
+
+  console.log(`✅ [EMAIL DEBUG] Email sent successfully to ${assignee.email} | MessageId: ${data.messageId}`);
 }
