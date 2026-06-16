@@ -1,32 +1,14 @@
-import { createTransport } from "nodemailer";
-
 export async function sendTaskAssignmentEmail(assignee, task) {
-  const smtpLogin = process.env.BREVO_SMTP_LOGIN;   // your Brevo account email
-  const smtpKey   = process.env.BREVO_SMTP_KEY;     // Brevo SMTP key (not API key)
-  const fromEmail = process.env.EMAIL_FROM || smtpLogin;
+  const apiKey    = process.env.SENDGRID_API_KEY;
+  const fromEmail = process.env.EMAIL_FROM;
   const fromName  = process.env.EMAIL_FROM_NAME || "Task Manager";
 
   console.log(`📧 [EMAIL DEBUG] Attempting to send email to: ${assignee.email}`);
-  console.log(`📧 [EMAIL DEBUG] BREVO_SMTP_LOGIN set: ${smtpLogin ? "YES (" + smtpLogin + ")" : "NO ❌"}`);
-  console.log(`📧 [EMAIL DEBUG] BREVO_SMTP_KEY set: ${smtpKey ? "YES (length: " + smtpKey.length + ")" : "NO ❌"}`);
+  console.log(`📧 [EMAIL DEBUG] SENDGRID_API_KEY set: ${apiKey ? "YES" : "NO ❌"}`);
+  console.log(`📧 [EMAIL DEBUG] EMAIL_FROM set: ${fromEmail ? "YES (" + fromEmail + ")" : "NO ❌"}`);
 
-  if (!smtpLogin || !smtpKey) {
-    throw new Error("BREVO_SMTP_LOGIN or BREVO_SMTP_KEY is missing in environment variables.");
-  }
-
-  const transporter = createTransport({
-    host: "smtp-relay.brevo.com",
-    port: 587,
-    secure: false, // STARTTLS
-    auth: {
-      user: smtpLogin,
-      pass: smtpKey,
-    },
-  });
-
-  console.log(`📧 [EMAIL DEBUG] Verifying Brevo SMTP connection...`);
-  await transporter.verify();
-  console.log(`📧 [EMAIL DEBUG] Brevo SMTP verified ✅`);
+  if (!apiKey)    throw new Error("SENDGRID_API_KEY is missing in environment variables.");
+  if (!fromEmail) throw new Error("EMAIL_FROM is missing in environment variables.");
 
   const teamMembersStr = task.assignedTo.map((m) => m.name).join("\n");
   const dueDateStr = new Date(task.deadline).toLocaleDateString("en-IN", {
@@ -84,12 +66,27 @@ Best Regards,
 Task Management System
 ${companyName}`;
 
-  const info = await transporter.sendMail({
-    from: `"${fromName}" <${fromEmail}>`,
-    to: assignee.email,
-    subject: `New Task Assigned: ${task.title}`,
-    text: emailBody,
+  const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      personalizations: [{ to: [{ email: assignee.email, name: assignee.name }] }],
+      from: { email: fromEmail, name: fromName },
+      subject: `New Task Assigned: ${task.title}`,
+      content: [{ type: "text/plain", value: emailBody }],
+    }),
   });
 
-  console.log(`✅ [EMAIL DEBUG] Email sent to ${assignee.email} | MessageId: ${info.messageId}`);
+  // SendGrid returns 202 Accepted on success (no body)
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const msg = errorData?.errors?.[0]?.message || response.statusText;
+    console.error(`❌ [EMAIL DEBUG] SendGrid error ${response.status}:`, errorData);
+    throw new Error(`Failed to send email: ${msg}`);
+  }
+
+  console.log(`✅ [EMAIL DEBUG] Email sent successfully to ${assignee.email} (SendGrid 202 Accepted)`);
 }
