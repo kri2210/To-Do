@@ -14,7 +14,7 @@ export async function sendTaskAssignmentEmail(assignee, task) {
 
   const transporter = createTransport({
     host: "smtp.gmail.com",
-    port: 587,
+    port: 465,
     secure: false,
     auth: { user, pass },
     tls: { rejectUnauthorized: false },
