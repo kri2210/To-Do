@@ -1,34 +1,30 @@
-import { createTransport } from "nodemailer";
+import { OAuth2Client } from "google-auth-library";
 
 export async function sendTaskAssignmentEmail(assignee, task) {
-  const user = process.env.EMAIL_USER;
-  const pass = process.env.EMAIL_APP_PASSWORD;
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+  const fromEmail = process.env.EMAIL_USER || "shahkrish221005@gmail.com";
 
   console.log(`📧 [EMAIL DEBUG] Attempting to send email to: ${assignee.email}`);
-  console.log(`📧 [EMAIL DEBUG] EMAIL_USER set: ${user ? "YES (" + user + ")" : "NO ❌"}`);
-  console.log(`📧 [EMAIL DEBUG] EMAIL_APP_PASSWORD set: ${pass ? "YES (length: " + pass.length + ")" : "NO ❌"}`);
+  console.log(`📧 [EMAIL DEBUG] GOOGLE_CLIENT_ID set: ${clientId ? "YES" : "NO ❌"}`);
+  console.log(`📧 [EMAIL DEBUG] GOOGLE_CLIENT_SECRET set: ${clientSecret ? "YES" : "NO ❌"}`);
+  console.log(`📧 [EMAIL DEBUG] GOOGLE_REFRESH_TOKEN set: ${refreshToken ? "YES" : "NO ❌"}`);
 
-  if (!user || !pass) {
-    throw new Error("EMAIL_USER or EMAIL_APP_PASSWORD is missing in environment variables.");
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error("Missing Google OAuth2 credentials (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, or GOOGLE_REFRESH_TOKEN) in environment variables.");
   }
 
-  const transporter = createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
-    auth: { user, pass },
-    connectionTimeout: 15000,
-    greetingTimeout: 15000,
-    socketTimeout: 20000,
-    tls: { rejectUnauthorized: false },
-    family: 4, // Force IPv4 — Render free tier doesn't support IPv6
-  });
+  // Set up OAuth2 Client
+  const oauth2Client = new OAuth2Client(clientId, clientSecret);
+  oauth2Client.setCredentials({ refresh_token: refreshToken });
 
-  console.log(`📧 [EMAIL DEBUG] Transporter created, verifying connection...`);
-
-  await transporter.verify();
-
-  console.log(`📧 [EMAIL DEBUG] SMTP connection verified ✅`);
+  console.log(`📧 [EMAIL DEBUG] Fetching new access token...`);
+  const { token: accessToken } = await oauth2Client.getAccessToken();
+  if (!accessToken) {
+    throw new Error("Failed to retrieve access token from Google OAuth2 client.");
+  }
+  console.log(`📧 [EMAIL DEBUG] Access token retrieved successfully.`);
 
   const teamMembersStr = task.assignedTo.map((m) => m.name).join("\n");
   const dueDateStr = new Date(task.deadline).toLocaleDateString("en-IN", {
@@ -86,12 +82,45 @@ Best Regards,
 Task Management System
 ${companyName}`;
 
-  const info = await transporter.sendMail({
-    from: `"Task Manager" <${user}>`,
-    to: assignee.email,
-    subject: `New Task Assigned: ${task.title}`,
-    text: emailBody,
+  // Formulate raw RFC 2822 email message with base64 transfer encoding
+  const utf8Subject = `=?utf-8?B?${Buffer.from(`New Task Assigned: ${task.title}`).toString("base64")}?=`;
+  const messageParts = [
+    `From: "Task Manager" <${fromEmail}>`,
+    `To: ${assignee.name} <${assignee.email}>`,
+    `Subject: ${utf8Subject}`,
+    `MIME-Version: 1.0`,
+    `Content-Type: text/plain; charset=utf-8`,
+    `Content-Transfer-Encoding: base64`,
+    ``,
+    Buffer.from(emailBody).toString("base64")
+  ];
+  const rawMessage = messageParts.join("\r\n");
+  const encodedMessage = Buffer.from(rawMessage)
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+
+  console.log(`📧 [EMAIL DEBUG] Sending API request to Gmail REST API...`);
+
+  const response = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      raw: encodedMessage
+    })
   });
 
-  console.log(`✅ [EMAIL DEBUG] Email sent successfully to ${assignee.email} | MessageId: ${info.messageId}`);
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    console.error("❌ [EMAIL DEBUG] Gmail API error response:", errorData);
+    const msg = errorData?.error?.message || response.statusText;
+    throw new Error(`Gmail API send failed: ${msg}`);
+  }
+
+  const result = await response.json();
+  console.log(`✅ [EMAIL DEBUG] Email sent successfully to ${assignee.email} via Gmail REST API | MessageId: ${result.id}`);
 }
