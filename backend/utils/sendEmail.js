@@ -13,17 +13,34 @@ export async function sendTaskAssignmentEmail(assignee, task) {
   }
 
   const transporter = createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: false,
-    auth: { user, pass },
-    tls: { rejectUnauthorized: false },
-  });
+  service: "gmail",
+  auth: {
+    user,
+    pass,
+  },
+
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 10000,
+
+  logger: true,
+  debug: true,
+});
 
   console.log(`📧 [EMAIL DEBUG] Transporter created, verifying connection...`);
 
-  await transporter.verify();
-  console.log(`📧 [EMAIL DEBUG] SMTP connection verified ✅`);
+  try {
+  const info = await transporter.sendMail({
+    from: user,
+    to: user,
+    subject: "SMTP Test",
+    text: "Testing from Render",
+  });
+
+  console.log("Mail sent:", info);
+} catch (err) {
+  console.error("SENDMAIL ERROR:", err);
+}
 
   const teamMembersStr = task.assignedTo.map((m) => m.name).join("\n");
   const dueDateStr = new Date(task.deadline).toLocaleDateString("en-IN", {
