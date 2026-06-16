@@ -1,18 +1,20 @@
-import { Resend } from "resend";
+import * as Brevo from "@getbrevo/brevo";
 
 export async function sendTaskAssignmentEmail(assignee, task) {
-  const apiKey = process.env.RESEND_API_KEY;
-  const fromEmail = process.env.EMAIL_FROM || "onboarding@resend.dev";
+  const apiKey = process.env.BREVO_API_KEY;
+  const fromEmail = process.env.EMAIL_FROM || "noreply@yourdomain.com";
+  const fromName = process.env.EMAIL_FROM_NAME || "Task Manager";
 
   console.log(`📧 [EMAIL DEBUG] Attempting to send email to: ${assignee.email}`);
-  console.log(`📧 [EMAIL DEBUG] RESEND_API_KEY set: ${apiKey ? "YES" : "NO ❌"}`);
-  console.log(`📧 [EMAIL DEBUG] FROM: ${fromEmail}`);
+  console.log(`📧 [EMAIL DEBUG] BREVO_API_KEY set: ${apiKey ? "YES" : "NO ❌"}`);
+  console.log(`📧 [EMAIL DEBUG] FROM: ${fromName} <${fromEmail}>`);
 
   if (!apiKey) {
-    throw new Error("RESEND_API_KEY is missing in environment variables.");
+    throw new Error("BREVO_API_KEY is missing in environment variables.");
   }
 
-  const resend = new Resend(apiKey);
+  const apiInstance = new Brevo.TransactionalEmailsApi();
+  apiInstance.authentications["api-key"].apiKey = apiKey;
 
   const teamMembersStr = task.assignedTo.map((m) => m.name).join("\n");
   const dueDateStr = new Date(task.deadline).toLocaleDateString("en-IN", {
@@ -70,17 +72,13 @@ Best Regards,
 Task Management System
 ${companyName}`;
 
-  const { data, error } = await resend.emails.send({
-    from: `Task Manager <${fromEmail}>`,
-    to: assignee.email,
-    subject: `New Task Assigned: ${task.title}`,
-    text: emailBody,
-  });
+  const sendSmtpEmail = new Brevo.SendSmtpEmail();
+  sendSmtpEmail.subject = `New Task Assigned: ${task.title}`;
+  sendSmtpEmail.textContent = emailBody;
+  sendSmtpEmail.sender = { name: fromName, email: fromEmail };
+  sendSmtpEmail.to = [{ email: assignee.email, name: assignee.name }];
 
-  if (error) {
-    console.error(`❌ [EMAIL DEBUG] Resend error:`, error);
-    throw new Error(`Failed to send email: ${error.message}`);
-  }
+  const result = await apiInstance.sendTransacEmail(sendSmtpEmail);
 
-  console.log(`✅ [EMAIL DEBUG] Email sent successfully to ${assignee.email} | MessageId: ${data.id}`);
+  console.log(`✅ [EMAIL DEBUG] Email sent successfully to ${assignee.email} | MessageId: ${result.body?.messageId || result.messageId}`);
 }
