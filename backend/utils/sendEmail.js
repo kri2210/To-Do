@@ -21,6 +21,7 @@ export async function sendTaskAssignmentEmail(assignee, task) {
     greetingTimeout: 15000,
     socketTimeout: 20000,
     tls: { rejectUnauthorized: false },
+    family: 4, // Force IPv4 — Render free tier doesn't support IPv6
   });
 
   console.log(`📧 [EMAIL DEBUG] Transporter created, verifying connection...`);
