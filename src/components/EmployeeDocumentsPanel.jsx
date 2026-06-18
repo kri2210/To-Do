@@ -142,7 +142,7 @@ export default function EmployeeDocumentsPanel({ employee, onClose }) {
 
           {!loading && !error && docs.length === 0 && (
             <div style={{ textAlign: "center", padding: "40px 16px", color: "var(--text-muted)" }}>
-              <div style={{ fontWeight: 600, marginBottom: 6 }}>No documents found</div>
+              <div style={{ fontWeight: 600, marginBottom: 6 }}>No Docs</div>
               <div style={{ fontSize: 13 }}>
                 Upload a file like{" "}
                 <code style={{ background: "var(--bg-main)", padding: "2px 6px", borderRadius: 4 }}>

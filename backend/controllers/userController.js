@@ -1,4 +1,35 @@
 import { User } from "../models/User.js";
+import { Document } from "../models/Document.js";
+
+// Helper to determine if a user has associated documents
+function hasDocuments(user, allDocs) {
+  const userId = user._id ? user._id.toString() : null;
+  const nameParts = (user.name || "").trim().split(/\s+/);
+  const firstName = nameParts[0] || "";
+  const fullNameNoSpace = nameParts.join("").toLowerCase();
+
+  const firstNameRegex = firstName ? new RegExp(`^${firstName}`, "i") : null;
+  const fullNameNoSpaceRegex = fullNameNoSpace ? new RegExp(fullNameNoSpace, "i") : null;
+
+  return allDocs.some((doc) => {
+    if (userId && doc.employeeId && doc.employeeId.toString() === userId) {
+      return true;
+    }
+    const empName = doc.employeeName || "";
+    const docName = doc.documentName || "";
+
+    if (empName && firstNameRegex && firstNameRegex.test(empName)) {
+      return true;
+    }
+    if (empName && fullNameNoSpaceRegex && fullNameNoSpaceRegex.test(empName)) {
+      return true;
+    }
+    if (docName && firstNameRegex && firstNameRegex.test(docName)) {
+      return true;
+    }
+    return false;
+  });
+}
 
 // GET /api/users  — admin: all users, senior: only employees
 export async function getUsers(user, query) {
@@ -13,7 +44,15 @@ export async function getUsers(user, query) {
   }
 
   const users = await User.find(filter).select("-password").sort({ createdAt: -1 });
-  return { status: 200, data: users };
+  const docs = await Document.find();
+
+  const usersWithDocInfo = users.map((u) => {
+    const userObj = u.toJSON();
+    userObj.hasDocs = hasDocuments(u, docs);
+    return userObj;
+  });
+
+  return { status: 200, data: usersWithDocInfo };
 }
 
 // POST /api/users  — admin only
