@@ -78,7 +78,7 @@ export default function EmployeeDocumentsPanel({ employee, onClose }) {
           zIndex: 1,
           width: "min(420px, 95vw)",
           height: "100vh",
-          background: "var(--bg-sidebar)",
+          background: "var(--bg-card)",
           borderLeft: "1px solid var(--border)",
           boxShadow: "-4px 0 24px rgba(0,0,0,0.12)",
           display: "flex",
@@ -142,14 +142,7 @@ export default function EmployeeDocumentsPanel({ employee, onClose }) {
 
           {!loading && !error && docs.length === 0 && (
             <div style={{ textAlign: "center", padding: "40px 16px", color: "var(--text-muted)" }}>
-              <div style={{ fontWeight: 600, marginBottom: 6 }}>No documents found</div>
-              <div style={{ fontSize: 13 }}>
-                Upload a file like{" "}
-                <code style={{ background: "var(--bg-main)", padding: "2px 6px", borderRadius: 4 }}>
-                  {employee?.name?.split(" ")[0]?.toLowerCase() ?? "name"}_resume.pdf
-                </code>{" "}
-                to Google Drive.
-              </div>
+              <div style={{ fontWeight: 500, fontSize: 14 }}>No docs</div>
             </div>
           )}
 
