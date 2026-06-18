@@ -54,4 +54,11 @@ export const tasksAPI = {
   getMyAnalytics: ()           => api.get("/tasks/my-analytics"),
 };
 
+// Documents
+export const documentsAPI = {
+  getByEmployee: (employeeId) => api.get("/documents", { params: { employeeId } }),
+  create:        (data)       => api.post("/documents", data),
+};
+
 export default api;
+

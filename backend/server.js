@@ -6,6 +6,7 @@ import { connectDatabase } from "./config/database.js";
 import { authRoutes } from "./routes/authRoutes.js";
 import { userRoutes } from "./routes/userRoutes.js";
 import { taskRoutes } from "./routes/taskRoutes.js";
+import { documentRoutes } from "./routes/documentRoutes.js";
 import { User } from "./models/User.js";
 import dns from "dns";
 
@@ -110,6 +111,8 @@ async function requestHandler(req, res) {
       result = await userRoutes(req, res, pathname, method, body);
     } else if (pathname.startsWith("/api/tasks")) {
       result = await taskRoutes(req, res, pathname, method, body);
+    } else if (pathname.startsWith("/api/documents")) {
+      result = await documentRoutes(req, res, pathname, method, body);
     } else if (pathname === "/api/health" && method === "GET") {
       result = { status: 200, data: { status: "ok", timestamp: new Date().toISOString() } };
     }

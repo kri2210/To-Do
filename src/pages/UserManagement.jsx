@@ -3,6 +3,7 @@ import { usersAPI } from "../api/api";
 import { useToast } from "../context/ToastContext";
 import { RoleBadge } from "../components/Badges";
 import UserModal from "../components/UserModal";
+import EmployeeDocumentsPanel from "../components/EmployeeDocumentsPanel";
 
 function formatDate(d) {
   if (!d) return "—";
@@ -17,6 +18,7 @@ export default function UserManagement() {
   const [editUser, setEditUser] = useState(null);
   const [search, setSearch] = useState("");
   const [filterRole, setFilterRole] = useState("All");
+  const [selectedUserForDocs, setSelectedUserForDocs] = useState(null);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -146,6 +148,25 @@ export default function UserManagement() {
                     <button className="btn btn-danger btn-sm" onClick={() => handleDelete(u)}>
                       Delete
                     </button>
+                    <button
+                      id={`view-docs-btn-${u.id || u._id}`}
+                      className="btn btn-sm"
+                      title="View employee documents"
+                      onClick={() => setSelectedUserForDocs(u)}
+                      style={{
+                        background: "linear-gradient(135deg, #6C47FF, #7C3AED)",
+                        color: "#fff",
+                        border: "none",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 5,
+                        fontWeight: 700,
+                        boxShadow: "0 2px 6px rgba(108,71,255,0.3)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      📄 Docs
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -160,6 +181,14 @@ export default function UserManagement() {
         onSaved={fetchUsers}
         editUser={editUser}
       />
+
+      {/* Employee Documents slide-in panel */}
+      {selectedUserForDocs && (
+        <EmployeeDocumentsPanel
+          employee={selectedUserForDocs}
+          onClose={() => setSelectedUserForDocs(null)}
+        />
+      )}
     </div>
   );
 }
