@@ -22,9 +22,27 @@ function normaliseType(raw) {
   return TYPE_MAP[key] ?? (raw.charAt(0).toUpperCase() + raw.slice(1));
 }
 
+// Strip leading '=' that n8n can accidentally add in JSON body expression mode
+function sanitize(val) {
+  if (typeof val === "string" && val.startsWith("=")) return val.slice(1);
+  return val;
+}
+
 // POST /api/documents — called by n8n after a new file is uploaded to Google Drive
 export async function createDocument(body) {
-  const { employeeName, documentType, documentName, driveLink, uploadedAt } = body;
+  const {
+    employeeName: _en,
+    documentType: _dt,
+    documentName: _dn,
+    driveLink:    _dl,
+    uploadedAt,
+  } = body;
+
+  // Sanitise — remove accidental '=' prefix from n8n expressions
+  const employeeName = sanitize(_en);
+  const documentType = sanitize(_dt);
+  const documentName = sanitize(_dn);
+  const driveLink    = sanitize(_dl);
 
   // 1. Require all core fields
   if (!documentName || !driveLink) {
