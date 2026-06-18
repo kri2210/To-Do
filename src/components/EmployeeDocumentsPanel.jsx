@@ -182,7 +182,7 @@ function DocumentCard({ doc }) {
         justifyContent: "space-between",
         gap: 12,
         padding: "12px 14px",
-        background: "var(--bg-card)",
+        background: "var(--bg-main)",
         border: "1px solid var(--border)",
         borderRadius: "var(--radius-lg)",
       }}
@@ -191,20 +191,18 @@ function DocumentCard({ doc }) {
         <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text-primary)", marginBottom: 2 }}>
           {doc.documentType}
         </div>
-        <div
-          style={{
-            fontSize: 12,
-            color: "var(--text-muted)",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-          title={doc.documentName}
-        >
-          {doc.documentName}
-        </div>
-        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
-          {dateStr}
+        {doc.email && (
+          <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+            {doc.email}
+          </div>
+        )}
+        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2, display: "flex", gap: 8 }}>
+          <span>{dateStr}</span>
+          {doc.confidence != null && (
+            <span style={{ color: doc.confidence >= 80 ? "#16a34a" : "#d97706" }}>
+              {doc.confidence}% confidence
+            </span>
+          )}
         </div>
       </div>
 

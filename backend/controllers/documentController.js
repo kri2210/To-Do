@@ -1,135 +1,159 @@
 import { Document } from "../models/Document.js";
 import { User } from "../models/User.js";
 
-// Accepted file-naming convention: employeeName_documentType.extension
-const FILENAME_REGEX = /^([a-zA-Z]+)_([a-zA-Z]+)\.[a-zA-Z0-9]+$/;
-
-// Friendly labels for common document type identifiers
-const TYPE_MAP = {
-  resume:      "Resume",
-  pan:         "PAN Card",
-  aadhar:      "Aadhar Card",
-  offer:       "Offer Letter",
-  certificate: "Certificate",
-  contract:    "Contract",
-  nda:         "NDA",
-  payslip:     "Payslip",
-  id:          "ID Card",
-};
-
-function normaliseType(raw) {
-  const key = raw.toLowerCase();
-  return TYPE_MAP[key] ?? (raw.charAt(0).toUpperCase() + raw.slice(1));
-}
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 // Strip leading '=' that n8n can accidentally add in JSON body expression mode
 function sanitize(val) {
   if (typeof val === "string" && val.startsWith("=")) return val.slice(1);
-  return val;
+  return val ?? null;
 }
 
-// POST /api/documents — called by n8n after a new file is uploaded to Google Drive
-export async function createDocument(body) {
-  const {
-    employeeName: _en,
-    documentType: _dt,
-    documentName: _dn,
-    driveLink:    _dl,
-    uploadedAt,
-  } = body;
+/**
+ * Try to find an employee in MongoDB using the AI-extracted data.
+ * Priority:  1. email (most reliable)
+ *            2. full personName exact-ish match
+ *            3. first name prefix match
+ */
+async function resolveEmployee(personName, email) {
+  let employee = null;
 
-  // Sanitise — remove accidental '=' prefix from n8n expressions
-  const employeeName = sanitize(_en);
-  const documentType = sanitize(_dt);
-  const documentName = sanitize(_dn);
-  const driveLink    = sanitize(_dl);
-
-  // 1. Require all core fields
-  if (!documentName || !driveLink) {
-    return {
-      status: 400,
-      data: { message: "documentName and driveLink are required." },
-    };
+  // 1. Match by email (most reliable)
+  if (email) {
+    employee = await User.findOne({
+      email: { $regex: new RegExp(`^${email.trim()}$`, "i") },
+    }).select("_id name email");
   }
 
-  // 2. Validate filename format if n8n hasn't pre-parsed the fields
-  let resolvedEmployeeName = employeeName;
-  let resolvedDocumentType  = documentType;
+  if (!employee && personName) {
+    const nameParts = personName.trim().split(/\s+/);
+    const firstName = nameParts[0];
+    const fullNoSpace = nameParts.join("").toLowerCase();
 
-  if (!resolvedEmployeeName || !resolvedDocumentType) {
-    const match = documentName.match(FILENAME_REGEX);
-    if (!match) {
-      return {
-        status: 400,
-        data: {
-          message: `Invalid filename format: "${documentName}". Expected: employeeName_documentType.ext`,
+    // 2. Full name without spaces (e.g. "KRISHMEHULSHAH" matches "Krish Mehul Shah")
+    employee = await User.findOne({
+      $expr: {
+        $regexMatch: {
+          input: { $toLower: { $replaceAll: { input: "$name", find: " ", replacement: "" } } },
+          regex: fullNoSpace,
+          options: "i",
         },
-      };
+      },
+    }).select("_id name email");
+
+    // 3. First-name prefix fallback
+    if (!employee) {
+      employee = await User.findOne({
+        name: { $regex: new RegExp(`^${firstName}`, "i") },
+      }).select("_id name email");
     }
-    const rawName = match[1];
-    const rawType = match[2];
-    resolvedEmployeeName = rawName.charAt(0).toUpperCase() + rawName.slice(1).toLowerCase();
-    resolvedDocumentType  = normaliseType(rawType);
   }
 
-  // 3. Try to resolve the employee in MongoDB (case-insensitive name match)
-  const employee = await User.findOne({
-    name: { $regex: new RegExp(`^${resolvedEmployeeName}`, "i") },
-  }).select("_id name");
+  return employee;
+}
 
-  const employeeId = employee?._id ?? null;
+// ─── POST /api/documents ──────────────────────────────────────────────────────
+// Called by n8n after AI has classified the uploaded document.
+// Expected body (AI-based workflow):
+// {
+//   "documentType": "Resume",
+//   "personName":   "KRISH MEHUL SHAH",
+//   "email":        "krishmehul2005@gmail.com",   // optional but helps matching
+//   "confidence":   100,
+//   "driveLink":    "https://drive.google.com/...",
+//   "documentName": "random_filename.pdf"          // optional
+// }
+export async function createDocument(body) {
+  // Sanitise all incoming strings (strips accidental '=' prefix from n8n)
+  const documentType = sanitize(body.documentType);
+  const personName   = sanitize(body.personName)   || sanitize(body.employeeName);
+  const email        = sanitize(body.email);
+  const confidence   = body.confidence ?? null;
+  const driveLink    = sanitize(body.driveLink);
+  const documentName = sanitize(body.documentName) || "";
+  const uploadedAt   = body.uploadedAt ? new Date(body.uploadedAt) : new Date();
 
-  // 4. Prevent exact duplicates (same file uploaded twice)
-  const duplicate = await Document.findOne({ documentName });
+  // Require the two most critical fields
+  if (!driveLink) {
+    return { status: 400, data: { message: "driveLink is required." } };
+  }
+  if (!documentType) {
+    return { status: 400, data: { message: "documentType is required." } };
+  }
+  if (!personName) {
+    return { status: 400, data: { message: "personName (or employeeName) is required." } };
+  }
+
+  // Prevent duplicate Drive links
+  const duplicate = await Document.findOne({ driveLink });
   if (duplicate) {
     return {
       status: 409,
-      data: { message: `Document "${documentName}" already exists.` },
+      data: { message: `A document with this Drive link already exists.` },
     };
   }
 
-  // 5. Save metadata
+  // Resolve employee in MongoDB
+  const employee   = await resolveEmployee(personName, email);
+  const employeeId = employee?._id ?? null;
+
+  // Store: use the AI-extracted personName as employeeName
   const doc = new Document({
-    employeeName: resolvedEmployeeName,
+    employeeName: personName,
     employeeId,
-    documentType: resolvedDocumentType,
+    documentType,
     documentName,
     driveLink,
-    uploadedAt: uploadedAt ? new Date(uploadedAt) : new Date(),
+    email,
+    confidence,
+    uploadedAt,
   });
 
   await doc.save();
 
-  return { status: 201, data: doc };
+  return {
+    status: 201,
+    data: {
+      ...doc.toJSON(),
+      matchedEmployee: employee ? { id: employee._id, name: employee.name } : null,
+    },
+  };
 }
 
+// ─── GET /api/documents?employeeId=<id> ───────────────────────────────────────
+// Admin only — used by the frontend docs panel
 export async function getDocumentsByEmployee(employeeId) {
   if (!employeeId) {
     return { status: 400, data: { message: "employeeId query param is required." } };
   }
 
-  const employee = await User.findById(employeeId).select("name");
+  const employee = await User.findById(employeeId).select("name email");
   if (!employee) {
     return { status: 404, data: { message: "Employee not found." } };
   }
 
-  const nameParts = employee.name.trim().split(/\s+/);
-  const firstName = nameParts[0];
-  const fullNameNoSpace = nameParts.join("").toLowerCase();
+  const nameParts   = employee.name.trim().split(/\s+/);
+  const firstName   = nameParts[0];
+  const fullNoSpace = nameParts.join("").toLowerCase();
 
-  const docs = await Document.find({
-    $or: [
-      { employeeId: employee._id },
-      { employeeName: { $regex: new RegExp(`^${firstName}`, "i") } },
-      { employeeName: { $regex: new RegExp(fullNameNoSpace, "i") } },
-      { documentName: { $regex: new RegExp(`^${firstName}`, "i") } },
-    ],
-  }).sort({ uploadedAt: -1 });
+  const orConditions = [
+    { employeeId: employee._id },
+    { employeeName: { $regex: new RegExp(`^${firstName}`, "i") } },
+    { employeeName: { $regex: new RegExp(fullNoSpace, "i") } },
+    { documentName: { $regex: new RegExp(`^${firstName}`, "i") } },
+  ];
+
+  // If employee has an email, also match by stored email
+  if (employee.email) {
+    orConditions.push({ email: { $regex: new RegExp(`^${employee.email.trim()}$`, "i") } });
+  }
+
+  const docs = await Document.find({ $or: orConditions }).sort({ uploadedAt: -1 });
 
   return { status: 200, data: docs };
 }
 
-// GET /api/documents — return all documents (admin only)
+// ─── GET /api/documents (all) ─────────────────────────────────────────────────
 export async function getAllDocuments() {
   const docs = await Document.find().sort({ uploadedAt: -1 });
   return { status: 200, data: docs };
