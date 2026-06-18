@@ -91,16 +91,23 @@ export async function getDocumentsByEmployee(employeeId) {
     return { status: 400, data: { message: "employeeId query param is required." } };
   }
 
-  // Also try name-based lookup as a fallback (for docs stored before employeeId was resolved)
   const employee = await User.findById(employeeId).select("name");
   if (!employee) {
     return { status: 404, data: { message: "Employee not found." } };
   }
 
+  // Build multiple name variants to match against
+  // e.g. "Krish Shah" → firstName="Krish", fullNameNoSpace="krishshah"
+  const nameParts = employee.name.trim().split(/\s+/);
+  const firstName = nameParts[0];
+  const fullNameNoSpace = nameParts.join("").toLowerCase();
+
   const docs = await Document.find({
     $or: [
-      { employeeId },
-      { employeeName: { $regex: new RegExp(`^${employee.name.split(" ")[0]}`, "i") } },
+      { employeeId: employee._id },
+      { employeeName: { $regex: new RegExp(`^${firstName}`, "i") } },
+      { employeeName: { $regex: new RegExp(fullNameNoSpace, "i") } },
+      { documentName: { $regex: new RegExp(`^${firstName}`, "i") } },
     ],
   }).sort({ uploadedAt: -1 });
 
