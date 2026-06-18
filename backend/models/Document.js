@@ -33,6 +33,7 @@ const documentSchema = new mongoose.Schema(
     },
   },
   {
+    collection: "documents",   // explicit — prevents Mongoose pluralisation ambiguity
     versionKey: false,
   }
 );
