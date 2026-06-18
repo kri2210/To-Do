@@ -103,7 +103,6 @@ export async function createDocument(body) {
   return { status: 201, data: doc };
 }
 
-// GET /api/documents?employeeId=<id>  — admin only, used by the frontend
 export async function getDocumentsByEmployee(employeeId) {
   if (!employeeId) {
     return { status: 400, data: { message: "employeeId query param is required." } };
@@ -114,8 +113,6 @@ export async function getDocumentsByEmployee(employeeId) {
     return { status: 404, data: { message: "Employee not found." } };
   }
 
-  // Build multiple name variants to match against
-  // e.g. "Krish Shah" → firstName="Krish", fullNameNoSpace="krishshah"
   const nameParts = employee.name.trim().split(/\s+/);
   const firstName = nameParts[0];
   const fullNameNoSpace = nameParts.join("").toLowerCase();

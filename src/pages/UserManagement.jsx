@@ -165,7 +165,7 @@ export default function UserManagement() {
                         cursor: "pointer",
                       }}
                     >
-                      📄 Docs
+                       Docs
                     </button>
                   </div>
                 </td>
