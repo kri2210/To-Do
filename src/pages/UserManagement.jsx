@@ -148,40 +148,25 @@ export default function UserManagement() {
                     <button className="btn btn-danger btn-sm" onClick={() => handleDelete(u)}>
                       Delete
                     </button>
-                    {u.hasDocs ? (
-                      <button
-                        id={`view-docs-btn-${u.id || u._id}`}
-                        className="btn btn-sm"
-                        title="View employee documents"
-                        onClick={() => setSelectedUserForDocs(u)}
-                        style={{
-                          background: "linear-gradient(135deg, #6C47FF, #7C3AED)",
-                          color: "#fff",
-                          border: "none",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 5,
-                          fontWeight: 700,
-                          boxShadow: "0 2px 6px rgba(108,71,255,0.3)",
-                          cursor: "pointer",
-                        }}
-                      >
-                         Docs
-                      </button>
-                    ) : (
-                      <span
-                        id={`no-docs-badge-${u.id || u._id}`}
-                        className="btn btn-secondary btn-sm"
-                        style={{
-                          color: "var(--text-muted)",
-                          borderColor: "var(--border)",
-                          cursor: "not-allowed",
-                          opacity: 0.6,
-                        }}
-                      >
-                        No Docs
-                      </span>
-                    )}
+                    <button
+                      id={`view-docs-btn-${u.id || u._id}`}
+                      className="btn btn-sm"
+                      title="View employee documents"
+                      onClick={() => setSelectedUserForDocs(u)}
+                      style={{
+                        background: "linear-gradient(135deg, #6C47FF, #7C3AED)",
+                        color: "#fff",
+                        border: "none",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 5,
+                        fontWeight: 700,
+                        boxShadow: "0 2px 6px rgba(108,71,255,0.3)",
+                        cursor: "pointer",
+                      }}
+                    >
+                       Docs
+                    </button>
                   </div>
                 </td>
               </tr>
