@@ -64,11 +64,14 @@ async function resolveEmployee(personName, email) {
 //   "documentName": "random_filename.pdf"          // optional
 // }
 export async function createDocument(body) {
+  // Support both flat format and nested "Your text" / "text" format from AI node
+  const aiData = body["Your text"] || body.text || {};
+
   // Sanitise all incoming strings (strips accidental '=' prefix from n8n)
-  const documentType = sanitize(body.documentType);
-  const personName   = sanitize(body.personName)   || sanitize(body.employeeName);
-  const email        = sanitize(body.email);
-  const confidence   = body.confidence ?? null;
+  const documentType = sanitize(body.documentType ?? aiData.documentType);
+  const personName   = sanitize(body.personName   ?? aiData.personName) || sanitize(body.employeeName ?? aiData.employeeName);
+  const email        = sanitize(body.email        ?? aiData.email);
+  const confidence   = body.confidence ?? aiData.confidence ?? null;
   const driveLink    = sanitize(body.driveLink);
   const documentName = sanitize(body.documentName) || "";
   const uploadedAt   = body.uploadedAt ? new Date(body.uploadedAt) : new Date();
